@@ -1,0 +1,15 @@
+{
+  "name": "launch-control",
+  "owner": { "name": "Peter", "url": "https://github.com/peter3605" },
+  "metadata": {
+    "description": "Ship-readiness tooling for solo builders using coding agents.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "lc",
+      "source": "./plugins/lc",
+      "description": "Bind every coding session to a story with machine-checkable acceptance criteria, and track the launch work an agent cannot do, ordered by external lead time."
+    }
+  ]
+}

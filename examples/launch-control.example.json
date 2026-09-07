@@ -1,0 +1,37 @@
+{
+  "project": "my-app",
+  "prefix": "APP",
+  "hub": "https://www.notion.so/<your hub page id>",
+  "projectPageId": "<the Projects-database row for this repo>",
+  "stories": {
+    "database": "https://www.notion.so/<stories database id>",
+    "dataSource": "collection://<stories data source id>"
+  },
+  "projects": {
+    "database": "https://www.notion.so/<projects database id>",
+    "dataSource": "collection://<projects data source id>"
+  },
+  "views": {
+    "ready": "https://www.notion.so/<db>?v=<view id>",
+    "inProgress": "https://www.notion.so/<db>?v=<view id>",
+    "inReview": "https://www.notion.so/<db>?v=<view id>",
+    "waitingExternal": "https://www.notion.so/<db>?v=<view id>",
+    "yourTurn": "https://www.notion.so/<db>?v=<view id>",
+    "board": "https://www.notion.so/<db>?v=<view id>",
+    "road": "https://www.notion.so/<db>?v=<view id>"
+  },
+  "note": "Prefer querying data sources in VIEW mode - it is unmetered on the free Notion plan. SQL mode is billed.",
+  "dependencies": "'Blocked by' is a RELATION (pass page URLs, not story IDs). 'Blocked by IDs' and 'Blocker status' are rollups - they render in Notion's UI but return opaque handles to the API, so resolve blockers by fetching the linked pages. Status=Ready already means unblocked.",
+  "viewContract": "Every project has its own 'road' view, filtered to that project and nothing else. Commands MUST scope by views.road - never by a shared browse view, whose filters anyone can change in the Notion UI.",
+  "git": {
+    "enabled": true,
+    "baseBranch": "main",
+    "mergeMethod": "squash",
+    "autoMerge": true,
+    "mergeIsDeploy": false,
+    "ciTimeoutMinutes": 20,
+    "extraChecks": [],
+    "notes": "Standing warnings for THIS repo that stay true between sessions: where live credentials sit in the working tree, which workflows are path-filtered, which runners are expensive. Anything about the current working tree goes stale within the session and belongs in a story's Last session field instead."
+  },
+  "notice": "Optional. Shown at the top of every session. Keep anything private - spend figures, account state - in launch-control.local.json instead, which is gitignored."
+}
