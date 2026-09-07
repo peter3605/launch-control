@@ -138,13 +138,31 @@ say ""
 
 # ------------------------------------------------------- 4. retire the copies
 say "4. Retire the copied command and hook files"
-if [ -d "$CLAUDE/commands" ] || [ -d "$CLAUDE/hooks" ]; then
-  act "move .claude/commands and .claude/hooks to .claude/_pre-plugin/ (kept, not deleted)"
+# Move ONLY the seven files this plugin owns. The commands directory can hold
+# other tools' commands - nightcrew keeps OpenSpec's opsx/ in there - and moving
+# the whole directory would silently break them.
+FOUND=0
+for f in next start mine status done groom reconcile; do
+  [ -f "$CLAUDE/commands/$f.md" ] && FOUND=$((FOUND+1))
+done
+for h in session-start stop; do
+  [ -f "$CLAUDE/hooks/$h.sh" ] && FOUND=$((FOUND+1))
+done
+if [ "$FOUND" -gt 0 ]; then
+  act "move $FOUND Launch Control file(s) to .claude/_pre-plugin/ (kept, not deleted)"
+  OTHERS=$(ls -A "$CLAUDE/commands" 2>/dev/null | grep -vE '^(next|start|mine|status|done|groom|reconcile)\.md$' || true)
+  if [ -n "$OTHERS" ]; then
+    say "  leaving in place (not ours): $(echo $OTHERS | tr '\n' ' ')"
+  fi
   if [ "$DRY" -eq 0 ]; then
-    mkdir -p "$CLAUDE/_pre-plugin"
-    for d in commands hooks; do
-      [ -d "$CLAUDE/$d" ] && mv "$CLAUDE/$d" "$CLAUDE/_pre-plugin/$d" || true
+    mkdir -p "$CLAUDE/_pre-plugin/commands" "$CLAUDE/_pre-plugin/hooks"
+    for f in next start mine status done groom reconcile; do
+      [ -f "$CLAUDE/commands/$f.md" ] && mv "$CLAUDE/commands/$f.md" "$CLAUDE/_pre-plugin/commands/" || true
     done
+    for h in session-start stop; do
+      [ -f "$CLAUDE/hooks/$h.sh" ] && mv "$CLAUDE/hooks/$h.sh" "$CLAUDE/_pre-plugin/hooks/" || true
+    done
+    rmdir "$CLAUDE/commands" "$CLAUDE/hooks" 2>/dev/null || true
   fi
 else
   say "  already gone"
@@ -175,6 +193,51 @@ cfg = json.load(open(p))
 cfg["installedVersion"] = v
 json.dump(cfg, open(p, "w"), indent=2)
 PY2
+fi
+say ""
+
+# ----------------------------------------- 7. CLAUDE.md command references
+say "7. CLAUDE.md"
+if [ -f "$TARGET/CLAUDE.md" ]; then
+  HITS=$(python3 - "$TARGET/CLAUDE.md" <<'PY2'
+import re, sys
+t = open(sys.argv[1]).read()
+print(len(re.findall(r"`/(next|mine|start|done|status|groom|reconcile)\b", t)))
+PY2
+)
+  if [ "$HITS" -gt 0 ]; then
+    act "rewrite $HITS command references to the /lc: namespace"
+    if [ "$DRY" -eq 0 ]; then
+      python3 - "$TARGET/CLAUDE.md" <<'PY2'
+import re, sys
+p = sys.argv[1]
+t = open(p).read()
+t = re.sub(r"`/(next|mine|start|done|status|groom|reconcile)\b", r"`/lc:\1", t)
+open(p, "w").write(t)
+PY2
+    fi
+  else
+    say "  no stale command references"
+  fi
+else
+  say "  no CLAUDE.md"
+fi
+say ""
+
+# ------------------------------------------------ 8. is the config tracked?
+say "8. Version control"
+if git -C "$TARGET" rev-parse --git-dir >/dev/null 2>&1; then
+  if git -C "$TARGET" ls-files --error-unmatch .claude/launch-control.json >/dev/null 2>&1; then
+    say "  launch-control.json is tracked - a fresh clone will have it"
+  else
+    say "  !! launch-control.json is NOT tracked by git."
+    say "     The hook's first line is [ -f launch-control.json ] || exit 0, so on a fresh"
+    say "     clone Launch Control does not warn - it silently does nothing. Commit it:"
+    say "       git -C $TARGET add -f .claude/launch-control.json CLAUDE.md"
+    say "     launch-control.local.json stays out; that is the point of the split."
+  fi
+else
+  say "  not a git repo"
 fi
 say ""
 
