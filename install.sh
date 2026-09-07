@@ -37,41 +37,51 @@ if [ ! -f "$CLAUDE/launch-control.json" ]; then
 fi
 
 # ---------------------------------------------------------------- 1. drift check
-say "1. Local edits that would be lost"
-LOST=0
-for f in next start mine status done groom reconcile; do
-  old="$CLAUDE/commands/$f.md"
-  new="$PLUGIN/skills/$f/SKILL.md"
-  [ -f "$old" ] || continue
-  # Compare bodies only - frontmatter legitimately differs between the two formats.
-  a="$(sed '1{/^---$/!q};1,/^---$/d' "$old" 2>/dev/null || true)"
-  b="$(sed '1{/^---$/!q};1,/^---$/d' "$new" 2>/dev/null || true)"
-  if [ "$a" != "$b" ]; then
-    n=$(diff <(printf '%s' "$a") <(printf '%s' "$b") | grep -c '^[<>]' || true)
-    say "  DIFFERS  commands/$f.md  ($n lines)"
-    LOST=1
-  fi
-done
-for h in session-start stop; do
-  [ -f "$CLAUDE/hooks/$h.sh" ] || continue
-  if ! cmp -s "$CLAUDE/hooks/$h.sh" "$PLUGIN/hooks/$h.sh"; then
-    say "  DIFFERS  hooks/$h.sh"
-    LOST=1
-  fi
-done
-if [ "$LOST" -eq 1 ]; then
-  say ""
-  say "  ^ These local copies differ from the plugin. Review them before applying;"
-  say "    an improvement made here and never propagated is exactly what gets lost."
-  say "    Diff with:  diff $CLAUDE/commands/<n>.md $PLUGIN/skills/<n>/SKILL.md"
-  if [ "$DRY" -eq 0 ]; then
+# A true drift check needs a BASELINE: the plugin version this repo was last
+# installed from. Without one we cannot tell "you edited this locally" from
+# "the plugin moved on since you copied it" - and reporting the second as the
+# first is crying wolf on every single install.
+PLUGIN_VERSION="$(python3 -c "import json;print(json.load(open('$PLUGIN/.claude-plugin/plugin.json')).get('version',''))" 2>/dev/null || true)"
+BASELINE="$(python3 -c "import json;print(json.load(open('$CLAUDE/launch-control.json')).get('installedVersion','') or '')" 2>/dev/null || true)"
+
+say "1. Local edits"
+if [ -z "$BASELINE" ]; then
+  if [ -d "$CLAUDE/commands" ]; then
+    say "  No baseline recorded - this repo predates the plugin."
+    say "  Its copies cannot be meaningfully diffed against v$PLUGIN_VERSION, because"
+    say "  the plugin has been generalized since they were made. They are NOT deleted:"
+    say "  step 4 moves them to .claude/_pre-plugin/ so you can diff at your leisure."
     say ""
-    say "  REFUSING to apply while local copies differ. Reconcile them first, or"
-    say "  delete the ones you have already propagated, then re-run --apply."
-    exit 3
+    say "  If you improved a command in place and never propagated it, that work is in"
+    say "  _pre-plugin/ and is the thing to review before you delete that folder."
+  else
+    say "  No baseline and no local copies - clean install."
   fi
 else
-  say "  none - local copies match the plugin"
+  LOST=0
+  for f in next start mine status done groom reconcile; do
+    old="$CLAUDE/commands/$f.md"
+    new="$PLUGIN/skills/$f/SKILL.md"
+    [ -f "$old" ] || continue
+    a="$(sed '1{/^---$/!q};1,/^---$/d' "$old" 2>/dev/null || true)"
+    b="$(sed '1{/^---$/!q};1,/^---$/d' "$new" 2>/dev/null || true)"
+    if [ "$a" != "$b" ]; then
+      n=$(diff <(printf '%s' "$a") <(printf '%s' "$b") | grep -c '^[<>]' || true)
+      say "  DIFFERS  commands/$f.md  ($n lines) - edited since v$BASELINE"
+      LOST=1
+    fi
+  done
+  if [ "$LOST" -eq 1 ]; then
+    say ""
+    say "  ^ Edited locally since this repo was installed from v$BASELINE."
+    say "    Propagate them into the plugin before applying, or they are lost."
+    if [ "$DRY" -eq 0 ]; then
+      say "  REFUSING to apply. Reconcile these first, then re-run --apply."
+      exit 3
+    fi
+  else
+    say "  none - local copies match v$BASELINE"
+  fi
 fi
 say ""
 
@@ -152,6 +162,20 @@ for line in ".claude/launch-control.local.json" ".claude/.current-story" ".claud
     [ "$DRY" -eq 0 ] && printf '%s\n' "$line" >> "$GI"
   fi
 done
+say ""
+
+# --------------------------------------------------- 6. stamp the baseline
+say "6. Baseline"
+act "record installedVersion = $PLUGIN_VERSION in launch-control.json"
+if [ "$DRY" -eq 0 ]; then
+  python3 - "$CLAUDE/launch-control.json" "$PLUGIN_VERSION" <<'PY2'
+import json, sys
+p, v = sys.argv[1], sys.argv[2]
+cfg = json.load(open(p))
+cfg["installedVersion"] = v
+json.dump(cfg, open(p, "w"), indent=2)
+PY2
+fi
 say ""
 
 say "Next:"
