@@ -1,3 +1,7 @@
 .DS_Store
 *.local.json
 .lc-probe
+.claude/launch-control.json
+.claude/launch-control.local.json
+.claude/.current-story
+.claude/.nudged
