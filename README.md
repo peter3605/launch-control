@@ -77,8 +77,13 @@ to you. See [`docs/config-reference.md`](docs/config-reference.md).
 
 v0.1.0, and honest about it: this was extracted from a working setup managing five
 projects, and has one real user. The Notion schema is provisioned by hand today.
-Persistence and dependency graphs are also available natively in Claude Code Tasks
-— what this adds on top is acceptance verification, board-vs-repo reconciliation,
-and the human-work critical path.
+
+What this is *not* is a task engine. Claude Code's native Tasks already persist
+work, track which task blocks which, and surface what just became unblocked — use
+them for the steps inside a story. Launch Control keeps a thin version of each only
+because the board has a reader native Tasks do not: a human looking across every
+project, at work that is not an agent's to do. The one thing it offers that nothing
+else does is the human-work critical path in `/lc:mine`. See
+[`docs/decisions/0001-native-tasks.md`](docs/decisions/0001-native-tasks.md).
 
 MIT.
