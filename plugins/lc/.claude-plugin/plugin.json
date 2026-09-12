@@ -1,6 +1,6 @@
 {
   "name": "lc",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Launch Control. A backlog where a story is only Done once its acceptance criteria have been checked, and where the work an agent CANNOT do is tracked as a first-class class of work, ordered by external lead time.",
   "author": { "name": "Peter", "url": "https://github.com/peter3605" },
   "homepage": "https://github.com/peter3605/launch-control",

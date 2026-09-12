@@ -21,6 +21,12 @@ Query views in **view mode**, not SQL mode: view mode is unmetered on Notion's
 free plan and SQL mode is billed. This is why the views are durable named objects
 rather than filters composed at call time.
 
+Every one of these can break without anything erroring. Run `/lc:doctor` after
+editing this file by hand: it fails on a missing view key, a view URL that does not
+resolve or points at another database, a `road` view that is empty or returns
+another project's stories, a Story ID on two rows, and a `baseBranch` that is not
+the remote's default branch.
+
 ## `git`
 
 | Key | Meaning |
@@ -40,7 +46,9 @@ rather than filters composed at call time.
 start". It is for facts that stay true — how to recognise a billing rejection,
 which runners are expensive, a known-broken assumption. Anything about the
 current working tree goes stale within the session and belongs in a story's
-**Last session** field instead.
+**Last session** field instead. `/lc:doctor` fails a `notice` or `git.notes` that
+names a story already Done on the board, since that is how in-flight state reads
+once it has outlived the flight.
 
 **`launch-control.local.json` is gitignored** and merged over the shared file at
 read time. Its keys override; its `notice` is *appended* rather than replacing.
