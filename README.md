@@ -60,6 +60,7 @@ command reads.
 | `/lc:status` | Where every project stands |
 | `/lc:groom <what>` | Files something newly discovered, with real acceptance criteria |
 | `/lc:reconcile` | Audits the board against the repo; evidence required to close anything |
+| `/lc:doctor [repo]` | Checks the config hasn't quietly broken: view keys, road scoping, base branch, duplicate IDs, notices naming finished stories. Exits non-zero on any |
 
 Two hooks do the rest: `SessionStart` tells a session which story it is bound to
 and reads out that repo's standing warnings; `Stop` refuses a silent exit while a

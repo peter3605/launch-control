@@ -3,7 +3,7 @@
   "owner": { "name": "Peter", "url": "https://github.com/peter3605" },
   "metadata": {
     "description": "Ship-readiness tooling for solo builders using coding agents.",
-    "version": "0.1.0"
+    "version": "0.2.0"
   },
   "plugins": [
     {
