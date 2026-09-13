@@ -1,0 +1,76 @@
+{
+  "_comment": "The board /lc:init provisions. docs/notion-schema.md is the prose; this is the contract init.py builds from and checks against. Change both together. Select options cannot contain commas, and descriptions must not contain single quotes (they are SQL string literals).",
+  "projects": {
+    "title": "Projects",
+    "properties": [
+      {"name": "Name", "type": "title"},
+      {"name": "Key", "type": "text", "description": "short slug a repo config names in project, e.g. my-app"},
+      {"name": "Repo", "type": "text", "description": "absolute path to the repo"},
+      {"name": "Kind", "type": "select", "options": [
+        ["iOS App", "blue"], ["Android App", "green"], ["Web + iOS", "purple"], ["Web App", "pink"],
+        ["Web Service", "orange"], ["Internal Tool", "gray"], ["Library", "brown"]
+      ]},
+      {"name": "State of play", "type": "text"}
+    ]
+  },
+  "stories": {
+    "title": "Stories",
+    "properties": [
+      {"name": "Name", "type": "title"},
+      {"name": "Story ID", "type": "text", "description": "stable id like APP-01 - quote it in commits and PRs"},
+      {"name": "Project", "type": "relation", "target": "projects", "dual": "Stories"},
+      {"name": "Status", "type": "select", "options": [
+        ["Backlog", "gray"], ["Ready", "blue"], ["In Progress", "yellow"], ["Blocked", "red"],
+        ["In Review", "purple"], ["Done", "green"]
+      ]},
+      {"name": "Done when", "type": "text", "description": "the acceptance criteria - checkable by someone who was not in the conversation"},
+      {"name": "Agent can do this", "type": "checkbox", "description": "checked = a coding session can complete it; unchecked = needs a human, a card, a login or a third party"},
+      {"name": "Gating", "type": "select", "options": [["Self-serve", "green"], ["External", "orange"]]},
+      {"name": "Lead time", "type": "text", "description": "why the third party takes as long as it does, when Gating is External"},
+      {"name": "Lead days min", "type": "number", "description": "calendar days on a good run"},
+      {"name": "Lead days max", "type": "number", "description": "calendar days on a bad but ordinary run"},
+      {"name": "Blocked by", "type": "relation", "target": "stories"},
+      {"name": "Notes and traps", "type": "text"},
+      {"name": "Last session", "type": "text", "description": "what the last session did on this story"},
+      {"name": "Seq", "type": "number", "description": "order within the project - lower runs first"},
+      {"name": "Type", "type": "select", "options": [["Launch Blocker", "red"], ["Backlog", "gray"], ["Chore", "brown"]]},
+      {"name": "Epic", "type": "select", "options": [
+        ["Build integrity", "blue"], ["Accounts and legal", "red"], ["Infrastructure", "orange"],
+        ["Third-party access", "yellow"], ["Store listing", "pink"], ["Beta and submission", "purple"],
+        ["Correctness", "brown"], ["Product", "green"], ["Polish", "gray"], ["Tooling and ops", "default"]
+      ]},
+      {"name": "Estimate", "type": "select", "options": [["XS", "gray"], ["S", "blue"], ["M", "yellow"], ["L", "orange"], ["XL", "red"]]}
+    ]
+  },
+  "views": [
+    {"key": "ready", "name": "Ready for Claude Code", "type": "table",
+     "filters": [["Status", "is", "Ready"], ["Agent can do this", "is", true]],
+     "sorts": [["Seq", "ASC"]],
+     "show": ["Name", "Story ID", "Project", "Estimate", "Epic", "Blocked by", "Done when", "Notes and traps"]},
+    {"key": "inProgress", "name": "In Progress", "type": "table",
+     "filters": [["Status", "is", "In Progress"]],
+     "sorts": [["Seq", "ASC"]],
+     "show": ["Name", "Story ID", "Project", "Done when", "Last session"]},
+    {"key": "inReview", "name": "PRs waiting on you", "type": "table",
+     "filters": [["Status", "is", "In Review"]],
+     "sorts": [["Seq", "ASC"]],
+     "show": ["Name", "Story ID", "Project", "Last session", "Estimate"]},
+    {"key": "waitingExternal", "name": "Waiting on someone else", "type": "table",
+     "filters": [["Gating", "is", "External"], ["Status", "is_not", "Done"]],
+     "sorts": [["Seq", "ASC"]],
+     "show": ["Name", "Story ID", "Project", "Lead time", "Lead days min", "Lead days max", "Status", "Blocked by"]},
+    {"key": "yourTurn", "name": "Your turn", "type": "table",
+     "filters": [["Agent can do this", "is", false], ["Type", "is", "Launch Blocker"], ["Status", "is_not", "Done"]],
+     "sorts": [["Gating", "DESC"], ["Seq", "ASC"]],
+     "show": ["Name", "Story ID", "Project", "Status", "Gating", "Lead time", "Lead days min", "Lead days max", "Estimate", "Blocked by", "Done when", "Notes and traps"]},
+    {"key": "board", "name": "Board", "type": "board",
+     "filters": [],
+     "groupBy": "Status",
+     "sorts": [["Seq", "ASC"]],
+     "show": ["Story ID", "Project", "Estimate", "Gating", "Name"]}
+  ],
+  "road": {"key": "road", "name": "Road — {key}", "type": "table",
+           "filters": [["Project", "contains", "{project_url}"]],
+           "sorts": [["Seq", "ASC"]],
+           "show": ["Name", "Story ID", "Status", "Type", "Seq", "Estimate", "Gating", "Agent can do this", "Done when"]}
+}

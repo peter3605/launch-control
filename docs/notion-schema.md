@@ -1,15 +1,21 @@
 # The board
 
-Two databases in one Notion page. The board is provisioned by hand today — an
-`lc init` that creates this over the API does not exist yet. A *project* on an
-existing board is provisioned by `/lc:plan`: its Projects row, its `road` view and
-the repo's config.
+Two databases in one Notion page. `/lc:init` provisions all of it over the API —
+both databases, every property below and every view — and puts the repo it runs in
+on the board. Every later repo joins with `/lc:plan --board`, which provisions a
+*project* on the existing board: its Projects row, its `road` view and the repo's
+config. Neither needs a visit to the Notion UI.
+
+[`plugins/lc/skills/init/board.json`](../plugins/lc/skills/init/board.json) is the
+same schema as a contract: `/lc:init` generates the databases and views from it and
+then checks what Notion reports back against it. Change the two together.
 
 ## Projects
 
-One row per repo. Minimal: **Name**, and whatever else you want to see. Its page ID
-goes in each repo's `projectPageId`. Stories relate to it. `/lc:plan` also fills
-**Key**, **Repo** and **Kind** when the database has them.
+One row per repo: **Name**, **Key**, **Repo**, **Kind** and **State of play**, plus
+whatever else you want to see. Its page ID goes in each repo's `projectPageId`.
+Stories relate to it. `/lc:plan` fills Key, Repo and Kind when the database has
+them.
 
 ## Stories
 
@@ -42,7 +48,9 @@ The work. Properties, in rough order of how much they carry:
 **Rollups are opaque over the API.** A rollup of the blockers' statuses renders
 correctly in the Notion UI but returns `rollupResult://` handles to the API. So
 commands treat `Status = Ready` as the primary unblocked signal, and fetch the
-linked pages when they need to verify. Do not build logic on a rollup.
+linked pages when they need to verify. Do not build logic on a rollup. `/lc:init`
+does not create any (see [decision 0001](decisions/0001-native-tasks.md)); add
+**Blocked by IDs** or **Blocker status** by hand if you want them in the UI.
 
 ## Views
 
