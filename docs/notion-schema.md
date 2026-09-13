@@ -1,12 +1,15 @@
 # The board
 
-Two databases in one Notion page. Provisioned by hand today — an `lc init` that
-creates this over the API is the obvious next thing and does not exist yet.
+Two databases in one Notion page. The board is provisioned by hand today — an
+`lc init` that creates this over the API does not exist yet. A *project* on an
+existing board is provisioned by `/lc:plan`: its Projects row, its `road` view and
+the repo's config.
 
 ## Projects
 
 One row per repo. Minimal: **Name**, and whatever else you want to see. Its page ID
-goes in each repo's `projectPageId`. Stories relate to it.
+goes in each repo's `projectPageId`. Stories relate to it. `/lc:plan` also fills
+**Key**, **Repo** and **Kind** when the database has them.
 
 ## Stories
 
