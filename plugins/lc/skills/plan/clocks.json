@@ -1,0 +1,436 @@
+{
+  "_about": "External clocks: launch steps whose duration is set by someone else. /lc:plan files each triggered clock as Gating External, Agent can do this unchecked, unprompted - a design document almost never mentions them, and every day one sits unstarted is added to the end of the launch. Lead times are typical public figures and they drift; say so in the story and link the source rather than presenting a number as a promise. Detection: `files` are globs on repo-relative paths, `content` pairs a glob with a regex matched inside those files, `text` is a regex matched against the source document. Any one match triggers the clock.",
+  "clocks": [
+    {
+      "key": "duns",
+      "name": "Get a D-U-N-S number for the company",
+      "leadTime": "About 5-7 business days after the request",
+      "epic": "Accounts and legal",
+      "estimate": "XS",
+      "blockedBy": [],
+      "doneWhen": "Dun & Bradstreet has issued a nine-digit D-U-N-S number for the legal entity, and Apple's D-U-N-S lookup tool returns that entity with the exact legal name and address that the Apple enrollment form will use.",
+      "notes": "Only needed to enroll as an ORGANIZATION. An individual enrollment skips it, but then the seller name on the App Store is a personal name - decline this clock only with that decision stated. Request it through Apple's own lookup tool, not a paid D&B service: the free route is the one Apple accepts. The name and address must match the enrollment form character for character or enrollment stalls.",
+      "detect": {
+        "files": [
+          "*.xcodeproj",
+          "*.xcworkspace",
+          "Package.swift",
+          "ios/Podfile"
+        ],
+        "content": [
+          [
+            "app.json",
+            "\"ios\"\\s*:"
+          ],
+          [
+            "package.json",
+            "\"react-native\"|\"expo\""
+          ]
+        ],
+        "text": [
+          "\\biOS\\b",
+          "App Store",
+          "iPhone",
+          "iPad",
+          "TestFlight",
+          "D-U-N-S"
+        ]
+      }
+    },
+    {
+      "key": "apple-enroll",
+      "name": "Enroll in the Apple Developer Program",
+      "leadTime": "1-2 days for an individual; several days to two weeks for an organization",
+      "epic": "Accounts and legal",
+      "estimate": "S",
+      "blockedBy": [
+        "duns"
+      ],
+      "doneWhen": "developer.apple.com/account shows an active membership with a Team ID, and App Store Connect lets the account holder create a new app record.",
+      "notes": "Needs a payment (the annual fee), an Apple ID with two-factor authentication, and for organizations a phone verification call from Apple to someone with authority to bind the company. Nothing on the store side - certificates, bundle IDs, TestFlight, the app record - can start until this is active.",
+      "detect": {
+        "files": [
+          "*.xcodeproj",
+          "*.xcworkspace",
+          "Package.swift",
+          "ios/Podfile"
+        ],
+        "content": [
+          [
+            "app.json",
+            "\"ios\"\\s*:"
+          ],
+          [
+            "package.json",
+            "\"react-native\"|\"expo\""
+          ]
+        ],
+        "text": [
+          "\\biOS\\b",
+          "App Store",
+          "iPhone",
+          "iPad",
+          "TestFlight"
+        ]
+      }
+    },
+    {
+      "key": "apple-paid-agreement",
+      "name": "Sign the Paid Apps Agreement and complete banking and tax",
+      "leadTime": "Usually 1-3 days to become active after banking and tax are submitted",
+      "epic": "Accounts and legal",
+      "estimate": "S",
+      "blockedBy": [
+        "apple-enroll"
+      ],
+      "doneWhen": "App Store Connect > Business shows the Paid Apps Agreement as Active, with banking and tax forms marked complete.",
+      "notes": "In-app purchases and subscriptions cannot be tested in sandbox, let alone sold, until this agreement is Active. It is the step most often discovered the week of submission.",
+      "detect": {
+        "files": [
+          "*.storekit"
+        ],
+        "content": [
+          [
+            "*.swift",
+            "import StoreKit|SKPaymentQueue|Product\\.products"
+          ],
+          [
+            "package.json",
+            "react-native-iap|react-native-purchases|expo-in-app-purchases"
+          ]
+        ],
+        "text": [
+          "in-app purchase",
+          "\\bIAP\\b",
+          "StoreKit",
+          "RevenueCat"
+        ]
+      }
+    },
+    {
+      "key": "testflight-beta-review",
+      "name": "Pass Beta App Review for external TestFlight testers",
+      "leadTime": "Commonly 1-2 days for the first external build",
+      "epic": "Beta and submission",
+      "estimate": "S",
+      "blockedBy": [
+        "apple-enroll"
+      ],
+      "doneWhen": "The build shows as Ready to Test for an external TestFlight group in App Store Connect, and at least one external tester has installed it.",
+      "notes": "Internal testers need no review; external testers do, and the first build of each version is reviewed. Include demo-account credentials in the review notes if the app has a login, or it is rejected.",
+      "detect": {
+        "files": [
+          "*.xcodeproj",
+          "*.xcworkspace"
+        ],
+        "content": [
+          [
+            "app.json",
+            "\"ios\"\\s*:"
+          ]
+        ],
+        "text": [
+          "TestFlight",
+          "beta testers?"
+        ]
+      }
+    },
+    {
+      "key": "app-review",
+      "name": "Pass App Store review for the first release",
+      "leadTime": "Apple states most reviews finish within 24-48 hours; new apps have been observed taking 7-30+ days, and each rejection restarts the clock",
+      "epic": "Beta and submission",
+      "estimate": "M",
+      "blockedBy": [
+        "apple-enroll"
+      ],
+      "doneWhen": "App Store Connect shows the version as Ready for Distribution (or Pending Developer Release).",
+      "notes": "Plan for at least one rejection. The common first-submission rejections are a missing account-deletion path for apps with sign-up, missing Sign in with Apple when any third-party login is offered, placeholder content, and privacy nutrition labels that do not match what the app collects.",
+      "detect": {
+        "files": [
+          "*.xcodeproj",
+          "*.xcworkspace"
+        ],
+        "content": [
+          [
+            "app.json",
+            "\"ios\"\\s*:"
+          ]
+        ],
+        "text": [
+          "App Store",
+          "\\biOS\\b",
+          "iPhone"
+        ]
+      }
+    },
+    {
+      "key": "play-dev-account",
+      "name": "Register and verify a Google Play developer account",
+      "leadTime": "Identity verification usually takes a few days",
+      "epic": "Accounts and legal",
+      "estimate": "S",
+      "blockedBy": [],
+      "doneWhen": "Play Console shows the developer account as verified and allows creating a new app.",
+      "notes": "Needs a one-time registration payment and government ID; organization accounts also need a D-U-N-S number.",
+      "detect": {
+        "files": [
+          "android/app/build.gradle",
+          "android/app/build.gradle.kts",
+          "app/build.gradle",
+          "app/build.gradle.kts"
+        ],
+        "content": [
+          [
+            "*.gradle",
+            "com\\.android\\.application"
+          ],
+          [
+            "*.gradle.kts",
+            "com\\.android\\.application"
+          ],
+          [
+            "app.json",
+            "\"android\"\\s*:"
+          ]
+        ],
+        "text": [
+          "\\bAndroid\\b",
+          "Google Play",
+          "Play Store"
+        ]
+      }
+    },
+    {
+      "key": "play-closed-testing",
+      "name": "Run the Google Play closed test required before production access",
+      "leadTime": "At least 14 consecutive days with 12 or more opted-in testers, then a production-access review of up to about 7 days",
+      "epic": "Beta and submission",
+      "estimate": "M",
+      "blockedBy": [
+        "play-dev-account"
+      ],
+      "doneWhen": "Play Console shows production access granted for the app (the Production track can be published to).",
+      "notes": "Applies to personal developer accounts created after November 2023. The 14 days only count while the testers remain opted in - recruit more than 12, because one dropping out can reset it. This is the longest fixed clock in an Android launch; start it with the first installable build, not the finished one.",
+      "detect": {
+        "files": [
+          "android/app/build.gradle",
+          "android/app/build.gradle.kts"
+        ],
+        "content": [
+          [
+            "*.gradle",
+            "com\\.android\\.application"
+          ],
+          [
+            "*.gradle.kts",
+            "com\\.android\\.application"
+          ],
+          [
+            "app.json",
+            "\"android\"\\s*:"
+          ]
+        ],
+        "text": [
+          "\\bAndroid\\b",
+          "Google Play",
+          "Play Store"
+        ]
+      }
+    },
+    {
+      "key": "ses-production",
+      "name": "Get Amazon SES out of the sandbox",
+      "leadTime": "About one business day per request; rejections are common and each resubmission waits again",
+      "epic": "Third-party access",
+      "estimate": "S",
+      "blockedBy": [],
+      "doneWhen": "`aws sesv2 get-account --region <region>` returns `\"ProductionAccessEnabled\": true` for the region the app sends from.",
+      "notes": "In the sandbox SES only delivers to verified addresses, so everything looks fine in testing and fails for the first real user. The request is per region. Describe the bounce and complaint handling concretely in the request - vague requests are the ones rejected.",
+      "detect": {
+        "content": [
+          [
+            "package.json",
+            "@aws-sdk/client-ses|@aws-sdk/client-sesv2"
+          ],
+          [
+            "*.tf",
+            "aws_ses|aws_sesv2"
+          ],
+          [
+            "*.py",
+            "client\\(['\"]sesv?2?['\"]"
+          ],
+          [
+            "requirements*.txt",
+            "boto3"
+          ],
+          [
+            "go.mod",
+            "service/sesv2|service/ses"
+          ]
+        ],
+        "text": [
+          "\\bSES\\b",
+          "Simple Email Service"
+        ]
+      }
+    },
+    {
+      "key": "stripe-activation",
+      "name": "Activate the Stripe account for live payments",
+      "leadTime": "Activation is often same-day but can take several days if Stripe asks for documents; the first payout typically lands 7-14 days after the first charge",
+      "epic": "Third-party access",
+      "estimate": "S",
+      "blockedBy": [],
+      "doneWhen": "The Stripe Dashboard shows the account as activated with charges and payouts enabled, and a live-mode API key exists.",
+      "notes": "Needs business details, a bank account and identity verification. Some business categories trigger manual review. Test-mode keys work regardless, which is why this is found late.",
+      "detect": {
+        "content": [
+          [
+            "package.json",
+            "\"stripe\"|@stripe/"
+          ],
+          [
+            "requirements*.txt",
+            "^stripe"
+          ],
+          [
+            "pyproject.toml",
+            "stripe"
+          ],
+          [
+            "Gemfile",
+            "stripe"
+          ],
+          [
+            "go.mod",
+            "stripe-go"
+          ]
+        ],
+        "text": [
+          "\\bStripe\\b"
+        ]
+      }
+    },
+    {
+      "key": "a2p-10dlc",
+      "name": "Register the A2P 10DLC brand and campaign for US SMS",
+      "leadTime": "Commonly 1-3 weeks for brand and campaign vetting",
+      "epic": "Third-party access",
+      "estimate": "S",
+      "blockedBy": [],
+      "doneWhen": "The SMS provider's console shows the brand as Verified and the campaign as Approved, with the sending number attached to it.",
+      "notes": "Unregistered application-to-person SMS to US numbers is filtered or blocked by carriers. Toll-free verification is the alternative and has its own review. Sample messages and an opt-in description are required.",
+      "detect": {
+        "content": [
+          [
+            "package.json",
+            "\"twilio\"|@vonage|messagebird|plivo"
+          ],
+          [
+            "requirements*.txt",
+            "twilio|vonage|plivo"
+          ]
+        ],
+        "text": [
+          "\\bSMS\\b",
+          "text message",
+          "Twilio",
+          "10DLC"
+        ]
+      }
+    },
+    {
+      "key": "google-oauth-verification",
+      "name": "Pass Google OAuth app verification",
+      "leadTime": "A few days for sensitive scopes; several weeks or more for restricted scopes, which also need a third-party security assessment",
+      "epic": "Third-party access",
+      "estimate": "M",
+      "blockedBy": [],
+      "doneWhen": "Google Cloud Console > OAuth consent screen shows the app as In production with verification status Verified.",
+      "notes": "Unverified apps are capped at 100 users and show an 'unverified app' warning. Basic sign-in scopes (openid, email, profile) do not need verification - check which scopes the code actually requests before filing this.",
+      "detect": {
+        "content": [
+          [
+            "*",
+            "googleapis\\.com/auth/(gmail|drive|calendar|contacts|spreadsheets|documents)"
+          ]
+        ],
+        "text": [
+          "Gmail API",
+          "Google Drive API",
+          "Google Calendar API",
+          "OAuth verification"
+        ]
+      }
+    },
+    {
+      "key": "meta-app-review",
+      "name": "Pass Meta app review and business verification",
+      "leadTime": "Days to several weeks, and business verification comes first",
+      "epic": "Third-party access",
+      "estimate": "M",
+      "blockedBy": [],
+      "doneWhen": "The Meta developer dashboard shows each permission the app uses as Advanced Access granted.",
+      "notes": "Needs a screencast per permission showing it in use, and a verified business. Standard access only works for users with a role on the app.",
+      "detect": {
+        "content": [
+          [
+            "package.json",
+            "facebook-nodejs-business-sdk|react-native-fbsdk|instagram"
+          ],
+          [
+            "*",
+            "graph\\.facebook\\.com"
+          ]
+        ],
+        "text": [
+          "Instagram Graph",
+          "Facebook Login",
+          "WhatsApp Business",
+          "Meta app review"
+        ]
+      }
+    },
+    {
+      "key": "chrome-web-store",
+      "name": "Pass Chrome Web Store review",
+      "leadTime": "Usually a few days; longer with broad host permissions or remote code",
+      "epic": "Beta and submission",
+      "estimate": "S",
+      "blockedBy": [],
+      "doneWhen": "The Chrome Web Store developer dashboard shows the item as Published.",
+      "notes": "Needs a one-time developer registration payment. Every permission must be justified in the listing, and requesting <all_urls> is the usual cause of extended review.",
+      "detect": {
+        "content": [
+          [
+            "manifest.json",
+            "\"manifest_version\"\\s*:\\s*3"
+          ]
+        ],
+        "text": [
+          "Chrome extension",
+          "Chrome Web Store"
+        ]
+      }
+    },
+    {
+      "key": "trademark",
+      "name": "File the trademark application for the product name",
+      "leadTime": "Months: a USPTO first examination typically takes six months or more",
+      "epic": "Accounts and legal",
+      "estimate": "M",
+      "blockedBy": [],
+      "doneWhen": "The USPTO (or relevant office) has issued a serial number for the application, recorded in this story's Last session.",
+      "notes": "Filing does not block launching, but a conflict found after launch means a rename. At minimum, run the search before the name is printed on a store listing.",
+      "detect": {
+        "text": [
+          "trademark",
+          "\\bUSPTO\\b",
+          "brand name"
+        ]
+      }
+    }
+  ]
+}
