@@ -43,6 +43,7 @@ Stop at the first failure and say which check failed. Nothing has been written y
     - `doneWhen`: the check, not the goal.
     - `blockedBy`: real dependencies only, as draft IDs. An edge that is merely "nicer to do first" is ordering, not blocking - express it by position instead.
     - `notes`: traps from the claims check, the clock notes, anything the next session would otherwise pay to rediscover.
+    - Put every file name and path in backticks, in every field. Notion stores a bare `DESIGN.md` or `cli.py` as a link to `http://DESIGN.md`, and that is what every later session reads out. `lint` fails on it.
     List stories in the order they should run; Seq follows that order, moved only as far as needed to put blockers first.
 11. **Write the proposal** to `<scratchpad>/lc-plan/proposal.json` in the format in `plan.py`'s docstring, and run `python3 <base directory>/plan.py lint <proposal> --repo <target> --source <source file> --epics "<the board's Epic options, comma-separated>"`. Fix every FAIL and re-run until it exits 0. Read the warnings; each one is a question you should be able to answer.
 12. **Present it for review** - in this order:

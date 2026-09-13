@@ -74,6 +74,11 @@ CHECKABLE = re.compile(
     r"\bapproved\b|\bverified\b|\bactive\b|\bissued\b|\bgranted\b|\bpublished\b|\breceives?\b",
     re.I,
 )
+# Notion turns a bare file name whose extension is also a TLD into a link to a web
+# host of that name: `DESIGN.md` is stored as [DESIGN.md](http://DESIGN.md). Inside
+# backticks it survives. Rather than track which extensions are TLDs, all must be quoted. Every Notes-and-traps field that was read out verbatim afterwards carried
+# the broken link, so it fails lint rather than warning.
+BARE_FILE = re.compile(r"(?<![`\w/.-])([\w./-]*\w\.(?:md|py|js|ts|tsx|jsx|json|ya?ml|toml|swift|kt|go|rs|rb|sh|txt|tf|gradle|lock|env|cfg|ini))\b(?![`\w/-])")
 STOP = set("a an the and or of to for in on with is are be it its this that as at by from "
            "into when so all any each can do does done has have not no yes via per".split())
 
@@ -339,6 +344,13 @@ def cmd_lint(args):
         if s.get("agent") is False and s.get("type") != "Launch Blocker":
             warn(f"{tag}: human work typed {s.get('type')!r} - the shared yourTurn view may filter to "
                  "Launch Blocker, which would hide it from /lc:mine")
+
+        for field in ("name", "doneWhen", "notes", "leadTime"):
+            outside = re.sub(r"`[^`]*`", "", s.get(field) or "")
+            bare = sorted(set(BARE_FILE.findall(outside)))
+            if bare:
+                fail(f"{tag}: {field} has bare file names {', '.join(bare)} - wrap them in backticks, "
+                     "or Notion may store them as links to http://<name> (it does for any extension that is also a TLD, like .md and .py)")
 
         for b in s.get("blockedBy") or []:
             if b not in known:
