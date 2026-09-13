@@ -24,7 +24,9 @@ The work. Properties, in rough order of how much they carry:
 | **Done when** | Text | Acceptance criteria, checkable by someone who was not in the conversation. Restating the title is not acceptance criteria |
 | **Agent can do this** | Checkbox | The honesty flag. Unchecked for anything needing a GUI, a login, a payment, a physical device, or a third party. This single property splits the board into "work" and "your desk" |
 | **Gating** | Select | `Self-serve` · `External`. External items are clocks, not tasks |
-| **Lead time** | Text | How many days the outside world will take. What lets `/lc:mine` rank by calendar cost |
+| **Lead time** | Text | Why the outside world takes as long as it does, and what makes it worse: "each rejection restarts the clock". Read by people, not computed with |
+| **Lead days min** | Number | Calendar days the third party takes on a good run. Convert business days (5 business = 7 calendar) |
+| **Lead days max** | Number | Calendar days on a bad but ordinary run — the prose's stated upper figure. With min, what lets `/lc:mine` project finish dates and rank by calendar cost. An External story with neither is listed as unranked, never guessed |
 | **Blocked by** | Relation → Stories (self) | Real edges. Lets `/lc:done` walk the graph and promote what just became unblocked |
 | **Notes and traps** | Text | Where expensive mistakes are recorded so they are paid for once. Commands read this out rather than summarising it |
 | **Last session** | Text | Date, what was done, commit SHA, PR number |
@@ -50,7 +52,7 @@ Seven, each answering one question. Every one is referenced by name in
 | Key | Filter | Read by |
 |---|---|---|
 | `ready` | Status is `Ready` **and** Agent can do this is checked | `/lc:next` |
-| `yourTurn` | Agent can do this is **un**checked, not Done | `/lc:mine` |
+| `yourTurn` | Agent can do this is **un**checked, Type is `Launch Blocker`, not Done | `/lc:mine` |
 | `inProgress` | Status is `In Progress` | `/lc:status` |
 | `inReview` | Status is `In Review` | `/lc:status` |
 | `waitingExternal` | Gating is `External`, not Done | `/lc:status` |

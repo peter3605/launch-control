@@ -15,7 +15,8 @@ So Launch Control tracks two kinds of work in one board:
 - **What the agent *cannot* do** — surfaced by `/lc:mine`, split into *clocks*
   (external, with a lead time you cannot compress) and *your desk* (self-serve,
   smallest first), and it names the single item that buys back the most calendar
-  time if you start it today.
+  time if you start it today — computed from each clock's lead days and the
+  blocker chain behind it, with the arithmetic shown, not judged by eye.
 
 The second one is the point. Nothing else reports it.
 
@@ -60,7 +61,7 @@ command reads.
 | `/lc:next` | Hands you the next unblocked story this session can actually do, traps read out in full |
 | `/lc:start <ID>` | Binds the session to a story: status, branch, `.current-story` |
 | `/lc:done` | Verifies the criteria, ships through a PR, merges by policy, records, unblocks dependents |
-| `/lc:mine` | The work only a human can do, longest external lead time first |
+| `/lc:mine [prefix]` | The work only a human can do: clocks by lead days with projected finish dates, your desk by estimate, and the one item to start today with its arithmetic |
 | `/lc:status` | Where every project stands |
 | `/lc:groom <what>` | Files something newly discovered, with real acceptance criteria |
 | `/lc:reconcile` | Audits the board against the repo; evidence required to close anything |
