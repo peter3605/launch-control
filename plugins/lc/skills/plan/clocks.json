@@ -1,10 +1,14 @@
 {
-  "_about": "External clocks: launch steps whose duration is set by someone else. /lc:plan files each triggered clock as Gating External, Agent can do this unchecked, unprompted - a design document almost never mentions them, and every day one sits unstarted is added to the end of the launch. Lead times are typical public figures and they drift; say so in the story and link the source rather than presenting a number as a promise. Detection: `files` are globs on repo-relative paths, `content` pairs a glob with a regex matched inside those files, `text` is a regex matched against the source document. Any one match triggers the clock.",
+  "_about": "External clocks: launch steps whose duration is set by someone else. /lc:plan files each triggered clock as Gating External, Agent can do this unchecked, unprompted - a design document almost never mentions them, and every day one sits unstarted is added to the end of the launch. Lead times are typical public figures and they drift; leadDays is [min, max] in calendar days, business days converted, max being the prose's stated upper figure, and it is what /lc:mine computes with; say so in the story and link the source rather than presenting a number as a promise. Detection: `files` are globs on repo-relative paths, `content` pairs a glob with a regex matched inside those files, `text` is a regex matched against the source document. Any one match triggers the clock.",
   "clocks": [
     {
       "key": "duns",
       "name": "Get a D-U-N-S number for the company",
       "leadTime": "About 5-7 business days after the request",
+      "leadDays": [
+        7,
+        9
+      ],
       "epic": "Accounts and legal",
       "estimate": "XS",
       "blockedBy": [],
@@ -41,6 +45,10 @@
       "key": "apple-enroll",
       "name": "Enroll in the Apple Developer Program",
       "leadTime": "1-2 days for an individual; several days to two weeks for an organization",
+      "leadDays": [
+        1,
+        14
+      ],
       "epic": "Accounts and legal",
       "estimate": "S",
       "blockedBy": [
@@ -78,6 +86,10 @@
       "key": "apple-paid-agreement",
       "name": "Sign the Paid Apps Agreement and complete banking and tax",
       "leadTime": "Usually 1-3 days to become active after banking and tax are submitted",
+      "leadDays": [
+        1,
+        3
+      ],
       "epic": "Accounts and legal",
       "estimate": "S",
       "blockedBy": [
@@ -111,6 +123,10 @@
       "key": "testflight-beta-review",
       "name": "Pass Beta App Review for external TestFlight testers",
       "leadTime": "Commonly 1-2 days for the first external build",
+      "leadDays": [
+        1,
+        2
+      ],
       "epic": "Beta and submission",
       "estimate": "S",
       "blockedBy": [
@@ -139,6 +155,10 @@
       "key": "app-review",
       "name": "Pass App Store review for the first release",
       "leadTime": "Apple states most reviews finish within 24-48 hours; new apps have been observed taking 7-30+ days, and each rejection restarts the clock",
+      "leadDays": [
+        1,
+        30
+      ],
       "epic": "Beta and submission",
       "estimate": "M",
       "blockedBy": [
@@ -168,6 +188,10 @@
       "key": "play-dev-account",
       "name": "Register and verify a Google Play developer account",
       "leadTime": "Identity verification usually takes a few days",
+      "leadDays": [
+        2,
+        7
+      ],
       "epic": "Accounts and legal",
       "estimate": "S",
       "blockedBy": [],
@@ -205,6 +229,10 @@
       "key": "play-closed-testing",
       "name": "Run the Google Play closed test required before production access",
       "leadTime": "At least 14 consecutive days with 12 or more opted-in testers, then a production-access review of up to about 7 days",
+      "leadDays": [
+        14,
+        21
+      ],
       "epic": "Beta and submission",
       "estimate": "M",
       "blockedBy": [
@@ -242,6 +270,10 @@
       "key": "ses-production",
       "name": "Get Amazon SES out of the sandbox",
       "leadTime": "About one business day per request; rejections are common and each resubmission waits again",
+      "leadDays": [
+        1,
+        3
+      ],
       "epic": "Third-party access",
       "estimate": "S",
       "blockedBy": [],
@@ -280,6 +312,10 @@
       "key": "stripe-activation",
       "name": "Activate the Stripe account for live payments",
       "leadTime": "Activation is often same-day but can take several days if Stripe asks for documents; the first payout typically lands 7-14 days after the first charge",
+      "leadDays": [
+        0,
+        7
+      ],
       "epic": "Third-party access",
       "estimate": "S",
       "blockedBy": [],
@@ -317,6 +353,10 @@
       "key": "a2p-10dlc",
       "name": "Register the A2P 10DLC brand and campaign for US SMS",
       "leadTime": "Commonly 1-3 weeks for brand and campaign vetting",
+      "leadDays": [
+        7,
+        21
+      ],
       "epic": "Third-party access",
       "estimate": "S",
       "blockedBy": [],
@@ -345,6 +385,10 @@
       "key": "google-oauth-verification",
       "name": "Pass Google OAuth app verification",
       "leadTime": "A few days for sensitive scopes; several weeks or more for restricted scopes, which also need a third-party security assessment",
+      "leadDays": [
+        3,
+        42
+      ],
       "epic": "Third-party access",
       "estimate": "M",
       "blockedBy": [],
@@ -369,6 +413,10 @@
       "key": "meta-app-review",
       "name": "Pass Meta app review and business verification",
       "leadTime": "Days to several weeks, and business verification comes first",
+      "leadDays": [
+        3,
+        28
+      ],
       "epic": "Third-party access",
       "estimate": "M",
       "blockedBy": [],
@@ -397,6 +445,10 @@
       "key": "chrome-web-store",
       "name": "Pass Chrome Web Store review",
       "leadTime": "Usually a few days; longer with broad host permissions or remote code",
+      "leadDays": [
+        2,
+        14
+      ],
       "epic": "Beta and submission",
       "estimate": "S",
       "blockedBy": [],
@@ -419,6 +471,10 @@
       "key": "trademark",
       "name": "File the trademark application for the product name",
       "leadTime": "Months: a USPTO first examination typically takes six months or more",
+      "leadDays": [
+        180,
+        365
+      ],
       "epic": "Accounts and legal",
       "estimate": "M",
       "blockedBy": [],
