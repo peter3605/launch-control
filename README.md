@@ -36,7 +36,10 @@ before submission.
 /plugin install lc@launch-control
 ```
 
-Then in each repo, create `.claude/launch-control.json` from
+For a repo that is not on the board yet, run `/lc:plan <design doc or repo path>`
+in it: it creates the project, its road view and `.claude/launch-control.json`, and
+files the backlog. To bring over a repo that used the older copied-files layout,
+create `.claude/launch-control.json` from
 [`examples/launch-control.example.json`](examples/launch-control.example.json)
 and run:
 
@@ -53,6 +56,7 @@ command reads.
 
 | Command | What it does |
 |---|---|
+| `/lc:plan <doc or repo>` | Turns a design doc or a repo into a project and its whole backlog: provisions the project, checks every claim against the repo, adds the external clocks the doc never mentions, and files nothing until you confirm |
 | `/lc:next` | Hands you the next unblocked story this session can actually do, traps read out in full |
 | `/lc:start <ID>` | Binds the session to a story: status, branch, `.current-story` |
 | `/lc:done` | Verifies the criteria, ships through a PR, merges by policy, records, unblocks dependents |
@@ -77,7 +81,7 @@ to you. See [`docs/config-reference.md`](docs/config-reference.md).
 ## Status
 
 v0.1.0, and honest about it: this was extracted from a working setup managing five
-projects, and has one real user. The Notion schema is provisioned by hand today.
+projects, and has one real user. The board itself is provisioned by hand today; projects on it are provisioned by `/lc:plan`.
 Persistence and dependency graphs are also available natively in Claude Code Tasks
 — what this adds on top is acceptance verification, board-vs-repo reconciliation,
 and the human-work critical path.
