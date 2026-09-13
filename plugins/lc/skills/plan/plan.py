@@ -24,7 +24,8 @@ PROPOSAL is the backlog the session drafted and the user reviewed:
      "claims": [{"claim", "verdict": "holds|false|partial|unverifiable", "evidence"}],
      "clocksDeclined": {"<clock key>": "<why this launch does not need it>"},
      "stories": [{"draft": "D1", "name", "type", "epic", "estimate", "gating",
-                  "agent": true|false, "leadTime", "doneWhen", "notes",
+                  "agent": true|false, "leadTime", "leadDays": [min, max],
+                  "doneWhen", "notes",
                   "blockedBy": ["D0"], "clock": "<clock key, if it is one>",
                   "agentOverride": "<why an agent can do it despite the wording>"}]}
 
@@ -140,6 +141,16 @@ def board_ids(board_path):
     return ids, complete
 
 
+def lead_days(story):
+    """(min, max) from a story's leadDays, or None if it is missing or malformed."""
+    v = story.get("leadDays")
+    if not (isinstance(v, list) and len(v) == 2):
+        return None
+    if not all(isinstance(n, (int, float)) and not isinstance(n, bool) for n in v):
+        return None
+    return (v[0], v[1]) if 0 <= v[0] <= v[1] else None
+
+
 def words(text):
     return {w for w in re.findall(r"[a-z0-9]+", (text or "").lower()) if w not in STOP and len(w) > 1}
 
@@ -226,6 +237,7 @@ def cmd_clocks(args):
         print(f"\n  {clock['key']}  ({reason}){dep}")
         print(f"    {clock['name']}")
         print(f"    Lead time:  {clock['leadTime']}")
+        print(f"    Lead days:  {clock['leadDays'][0]}-{clock['leadDays'][1]} calendar")
         print(f"    Done when:  {clock['doneWhen']}")
         print(f"    Notes:      {clock['notes']}")
     print(f"\n{len(hits)} clock(s). File each as Gating External, agent unchecked, with `clock` set to its key -")
@@ -339,8 +351,12 @@ def cmd_lint(args):
                      "uncheck it, or add agentOverride saying why an agent can do it anyway")
             if s.get("gating") == "External":
                 fail(f"{tag}: External gating means a third party holds the clock - agent must be false")
-        if s.get("gating") == "External" and not (s.get("leadTime") or "").strip():
-            fail(f"{tag}: External with no lead time - /lc:mine ranks clocks by it")
+        if s.get("gating") == "External":
+            if not (s.get("leadTime") or "").strip():
+                fail(f"{tag}: External with no lead time - say why the outside world takes as long as it does")
+            if lead_days(s) is None:
+                fail(f"{tag}: External needs leadDays [min, max], calendar days with 0 <= min <= max - "
+                     "/lc:mine computes with these and lists a clock without them as unranked")
         if s.get("agent") is False and s.get("type") != "Launch Blocker":
             warn(f"{tag}: human work typed {s.get('type')!r} - the shared yourTurn view may filter to "
                  "Launch Blocker, which would hide it from /lc:mine")
@@ -466,6 +482,8 @@ def cmd_payload(args):
         "Gating": story["gating"],
         "Agent can do this": "__YES__" if story["agent"] else "__NO__",
         "Lead time": story.get("leadTime") or "",
+        "Lead days min": (lead_days(story) or (None, None))[0],
+        "Lead days max": (lead_days(story) or (None, None))[1],
         "Done when": story["doneWhen"],
         "Notes and traps": story.get("notes") or "",
         "Seq": seq,

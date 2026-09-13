@@ -26,7 +26,7 @@ Stop at the first failure and say which check failed. Nothing has been written y
 3. **The target must not be on the board already.** If `<target>/.claude/launch-control.json` exists, stop: this repo already has a project. Use `/lc:groom` for new items or `/lc:reconcile` to re-audit. The one exception is a resumed run - `<target>/.claude/lc-plan/state.json` exists - see **Resuming** below.
 4. **Find the board.** `--board` if given. Otherwise read `launch-control.json` from this session's project and from every sibling of the target (`<target>/../*/.claude/launch-control.json`), and group them by `stories.dataSource`. Exactly one board: use it, and name the file you took it from. More than one: ask which. None: stop - there is no board to plan onto.
 5. **Check the board can take a project.** Fetch the Stories database and the Projects database.
-   - Stories must have: Name, Story ID, Project (relation), Status with `Ready` and `Backlog` options, Done when, Agent can do this, Gating with `Self-serve` and `External`, Lead time, Blocked by (relation), Notes and traps, Seq, Type, Epic, Estimate. Note the Epic options - they go to `lint --epics`.
+   - Stories must have: Name, Story ID, Project (relation), Status with `Ready` and `Backlog` options, Done when, Agent can do this, Gating with `Self-serve` and `External`, Lead time, Lead days min and Lead days max (numbers), Blocked by (relation), Notes and traps, Seq, Type, Epic, Estimate. Note the Epic options - they go to `lint --epics`.
    - The chosen config must carry all six shared views (`ready`, `inProgress`, `inReview`, `waitingExternal`, `yourTurn`, `board`) - `plan.py config` copies them.
    - Note the Projects title property and whether `Key`, `Repo` and `Kind` exist, and Kind's options.
    - **Fetch the `yourTurn` view** and note its filter. If it filters on `Type = Launch Blocker`, human work typed anything else will never reach `/lc:mine` - type human stories that gate the launch as Launch Blocker.
@@ -36,7 +36,7 @@ Stop at the first failure and say which check failed. Nothing has been written y
 
 7. **Inventory the repo before believing the document.** Top-level tree, `git log --oneline | head -50` and the commit count, manifests (`package.json`, `pyproject.toml`, `Package.swift`, `*.xcodeproj`, `build.gradle`, `go.mod`, `Cargo.toml`), test directories and how many tests exist, CI workflows, infrastructure (`*.tf`, `Dockerfile`, deploy configs), and env examples. An empty repo is an answer too - then the document is all there is, and its claims are `unverifiable`, not `holds`.
 8. **Extract every claim the source makes about the state of things** - built, not built, deployed, decided, pending - and check each against the inventory. Record each as `holds`, `false`, `partial` or `unverifiable`, with the evidence (a path, a command and its output, a commit). Work that is already done does not become a story; a claim marked `false` usually changes one.
-9. **Run `python3 <base directory>/plan.py clocks --repo <target> --source <source file>`.** These are the external clocks this launch has - store reviews, account verifications, sandbox exits - with lead times the outside world sets. File every one it prints as its own story (`gating: External`, `agent: false`, `clock: <key>`, `leadTime`, `doneWhen` and `notes` from the clock, adjusted to this project), keeping the clock's own `blockedBy` edges between clocks. Decline one only with a concrete reason in `clocksDeclined` ("enrolling as an individual, so no D-U-N-S"). Then think past the list: if this launch has a clock it does not know - a regulator, a partner's API approval, a hardware certification - file that too. The document will almost never mention these, and they are the reason this command exists.
+9. **Run `python3 <base directory>/plan.py clocks --repo <target> --source <source file>`.** These are the external clocks this launch has - store reviews, account verifications, sandbox exits - with lead times the outside world sets. File every one it prints as its own story (`gating: External`, `agent: false`, `clock: <key>`, `leadTime`, `leadDays`, `doneWhen` and `notes` from the clock, adjusted to this project), keeping the clock's own `blockedBy` edges between clocks. Decline one only with a concrete reason in `clocksDeclined` ("enrolling as an individual, so no D-U-N-S"). Then think past the list: if this launch has a clock it does not know - a regulator, a partner's API approval, a hardware certification - file that too. The document will almost never mention these, and they are the reason this command exists.
 10. **Draft the stories.** Split the remaining work into stories a single session can finish: XS under an hour, S 1-3 hours, M half a day, L 1-2 days, XL 3+ days - split anything bigger than L. For each:
     - `type`: Launch Blocker if users cannot be served without it, Backlog if it is a better product, Chore otherwise. Launch Blockers take plain IDs (`APP-07`), everything else the `-B` series.
     - `agent`: false for anything needing a human at a GUI, a login, a payment, a device, legal judgement or a third party. Code that *implements* a login is agent work; *logging in to* a console is not. If the wording trips `lint` but an agent really can do it, give `agentOverride` a reason.
@@ -49,7 +49,7 @@ Stop at the first failure and say which check failed. Nothing has been written y
 12. **Present it for review** - in this order:
     - What will be provisioned: the Projects row (name, key), the road view name, the config path, and the board it goes on.
     - **Claims checked**: claim, verdict, evidence. This table is how the user sees the document was not taken on trust.
-    - **The backlog**, one table: draft ID, proposed Story ID series (`TP-nn` or `TP-Bn` - say the real numbers are assigned at filing), Name, Type, Estimate, Gating, Agent can do this, Lead time, Blocked by, Done when. Do not abbreviate Done when.
+    - **The backlog**, one table: draft ID, proposed Story ID series (`TP-nn` or `TP-Bn` - say the real numbers are assigned at filing), Name, Type, Estimate, Gating, Agent can do this, Lead time, Lead days, Blocked by, Done when. Do not abbreviate Done when.
     - External clocks filed and declined, with the reasons.
     - What `/lc:next` would hand out first and what `/lc:mine` would lead with, once filed.
 
@@ -84,9 +84,9 @@ Do these in order. If a step fails, stop: say exactly what now exists (with URLs
 ## 4. Report
 
 - The Projects row, the road view, and the config path.
-- Every story filed: Story ID, name, Status, Agent can do this, Gating, Lead time.
+- Every story filed: Story ID, name, Status, Agent can do this, Gating, Lead time, Lead days.
 - Claims that turned out false, in one line each - that is where the document was wrong.
-- **The first story `/lc:next` returns** in that repo (lowest Seq, Ready, agent-doable) and **what `/lc:mine` leads with** (the unblocked External clock with the longest lead time). Name the clock to start today.
+- **The first story `/lc:next` returns** in that repo (lowest Seq, Ready, agent-doable) and **what `/lc:mine` leads with** (the item `/lc:mine` names under Start today, now that the rows are filed). Name the clock to start today.
 - Whether to commit `.claude/launch-control.json`: yes for a private repo, so a fresh clone works (the hooks silently do nothing without it); no for a public one, where the board's IDs should stay out of history.
 - `.claude/lc-plan/` can be deleted once `/lc:doctor` is clean; it is gitignored until then.
 
