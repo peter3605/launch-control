@@ -15,7 +15,8 @@ So Launch Control tracks two kinds of work in one board:
 - **What the agent *cannot* do** — surfaced by `/lc:mine`, split into *clocks*
   (external, with a lead time you cannot compress) and *your desk* (self-serve,
   smallest first), and it names the single item that buys back the most calendar
-  time if you start it today.
+  time if you start it today — computed from each clock's lead days and the
+  blocker chain behind it, with the arithmetic shown, not judged by eye.
 
 The second one is the point. Nothing else reports it.
 
@@ -36,7 +37,10 @@ before submission.
 /plugin install lc@launch-control
 ```
 
-Then in each repo, create `.claude/launch-control.json` from
+For a repo that is not on the board yet, run `/lc:plan <design doc or repo path>`
+in it: it creates the project, its road view and `.claude/launch-control.json`, and
+files the backlog. To bring over a repo that used the older copied-files layout,
+create `.claude/launch-control.json` from
 [`examples/launch-control.example.json`](examples/launch-control.example.json)
 and run:
 
@@ -53,13 +57,15 @@ command reads.
 
 | Command | What it does |
 |---|---|
+| `/lc:plan <doc or repo>` | Turns a design doc or a repo into a project and its whole backlog: provisions the project, checks every claim against the repo, adds the external clocks the doc never mentions, and files nothing until you confirm |
 | `/lc:next` | Hands you the next unblocked story this session can actually do, traps read out in full |
 | `/lc:start <ID>` | Binds the session to a story: status, branch, `.current-story` |
 | `/lc:done` | Verifies the criteria, ships through a PR, merges by policy, records, unblocks dependents |
-| `/lc:mine` | The work only a human can do, longest external lead time first |
+| `/lc:mine [prefix]` | The work only a human can do: clocks by lead days with projected finish dates, your desk by estimate, and the one item to start today with its arithmetic |
 | `/lc:status` | Where every project stands |
 | `/lc:groom <what>` | Files something newly discovered, with real acceptance criteria |
 | `/lc:reconcile` | Audits the board against the repo; evidence required to close anything |
+| `/lc:doctor [repo]` | Checks the config hasn't quietly broken: view keys, road scoping, base branch, duplicate IDs, notices naming finished stories. Exits non-zero on any |
 
 Two hooks do the rest: `SessionStart` tells a session which story it is bound to
 and reads out that repo's standing warnings; `Stop` refuses a silent exit while a
@@ -76,7 +82,7 @@ to you. See [`docs/config-reference.md`](docs/config-reference.md).
 ## Status
 
 v0.1.0, and honest about it: this was extracted from a working setup managing five
-projects, and has one real user. The Notion schema is provisioned by hand today.
+projects, and has one real user. The board itself is provisioned by hand today; projects on it are provisioned by `/lc:plan`.
 
 What this is *not* is a task engine. Claude Code's native Tasks already persist
 work, track which task blocks which, and surface what just became unblocked — use

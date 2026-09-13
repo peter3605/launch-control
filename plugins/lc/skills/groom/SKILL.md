@@ -21,7 +21,7 @@ File **$ARGUMENTS** into the Launch Control backlog.
 
    Why this rather than just taking the next free number: two sessions grooming the same prefix at once both read the same highest number and both write it. That is not theoretical — it happened three times in a single day during development, and once to the very story filed to fix it. IDs are per-prefix, so the race is per-prefix: you collide only with another session grooming this same project.
 
-5. Create the page with: Name (short, imperative), Story ID, Project relation, Type, Epic, Seq, Estimate, Gating, **Done when**, **Agent can do this**, and **Notes and traps** if you learned something worth not re-learning. If it depends on other stories, set the **Blocked by** relation to their pages — it is a relation, not text, so pass page URLs.
+5. Create the page with: Name (short, imperative), Story ID, Project relation, Type, Epic, Seq, Estimate, Gating, **Done when**, **Lead time** and **Lead days min**/**max** if Gating is External (calendar days, business days converted; a clock without the numbers is unranked in `/lc:mine`), **Agent can do this**, and **Notes and traps** if you learned something worth not re-learning. If it depends on other stories, set the **Blocked by** relation to their pages — it is a relation, not text, so pass page URLs.
 6. Set **Status** to `Ready` if nothing blocks it, `Backlog` otherwise.
 7. Report the new story ID and where it lands in the sequence.
 
