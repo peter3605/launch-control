@@ -52,6 +52,10 @@ and run:
 ./install.sh /path/to/your/repo --apply
 ```
 
+`--apply` refuses, changing nothing, while that repo has a story bound in
+`.claude/.current-story` or uncommitted changes under `.claude/` or to `.gitignore`:
+a live session editing the same files can undo the install's ignore lines.
+
 [`docs/notion-schema.md`](docs/notion-schema.md) describes the two databases, the
 properties that carry weight, and the views each command reads.
 

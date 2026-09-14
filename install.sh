@@ -36,6 +36,43 @@ if [ ! -f "$CLAUDE/launch-control.json" ]; then
   exit 1
 fi
 
+# ------------------------------------------- 0. is something else working here?
+# Every later step writes to .claude/ or .gitignore. If a session is live in the
+# target, it may be rewriting those same files: on 2026-09-08 one did, dropped the
+# ignore lines this script had just added, and the next commit swept
+# launch-control.local.json into git. So refuse while anything looks in flight.
+# Untracked files are not counted - a freshly created launch-control.json is the
+# normal starting point for an install.
+say "0. Other work in progress"
+BUSY=0
+STORY=""
+[ -f "$CLAUDE/.current-story" ] && STORY="$(tr -d '[:space:]' < "$CLAUDE/.current-story")"
+if [ -n "$STORY" ]; then
+  say "  BOUND    .claude/.current-story names $STORY - a session is working that story here."
+  say "           Finish it with /lc:done in that session, or, if no session is running,"
+  say "           empty the file (: > $CLAUDE/.current-story)."
+  BUSY=1
+fi
+if git -C "$TARGET" rev-parse --git-dir >/dev/null 2>&1; then
+  DIRTY="$(git -C "$TARGET" status --porcelain --untracked-files=no -- .claude .gitignore)"
+  if [ -n "$DIRTY" ]; then
+    say "  DIRTY    uncommitted changes to files this script edits:"
+    printf '%s\n' "$DIRTY" | sed 's/^/             /'
+    say "           Commit or stash them (git -C $TARGET stash), then re-run."
+    BUSY=1
+  fi
+fi
+if [ "$BUSY" -eq 1 ]; then
+  if [ "$DRY" -eq 0 ]; then
+    say "  REFUSING to apply. Nothing has been changed."
+    exit 4
+  fi
+  say "  ^ --apply will refuse until these are cleared."
+else
+  say "  none"
+fi
+say ""
+
 # ---------------------------------------------------------------- 1. drift check
 # A true drift check needs a BASELINE: the plugin version this repo was last
 # installed from. Without one we cannot tell "you edited this locally" from
