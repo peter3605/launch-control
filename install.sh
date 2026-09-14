@@ -236,10 +236,14 @@ say ""
 # ----------------------------------------- 7. CLAUDE.md command references
 say "7. CLAUDE.md"
 if [ -f "$TARGET/CLAUDE.md" ]; then
+  # The backtick is spelled \x60 here, not literally. Stock macOS bash 3.2 scans a
+  # heredoc inside $( ) for backticks even when the delimiter is quoted, so a literal
+  # one fails to parse the whole if-block - after steps 1-6 have already written.
+  # Check any edit with /bin/bash -n install.sh, not whatever bash is on PATH.
   HITS=$(python3 - "$TARGET/CLAUDE.md" <<'PY2'
 import re, sys
 t = open(sys.argv[1]).read()
-print(len(re.findall(r"`/(next|mine|start|done|status|groom|reconcile)\b", t)))
+print(len(re.findall(r"\x60/(next|mine|start|done|status|groom|reconcile)\b", t)))
 PY2
 )
   if [ "$HITS" -gt 0 ]; then
