@@ -78,13 +78,62 @@ Two hooks do the rest: `SessionStart` tells a session which story it is bound to
 and reads out that repo's standing warnings; `Stop` refuses a silent exit while a
 story is still claimed — once per story, so it nudges but never traps you.
 
+## If you have hooks of your own
+
+The plugin ships its two hooks in `plugins/lc/hooks/hooks.json`. What happens when
+a project's own `.claude/settings.json` *also* has `SessionStart` or `Stop` hooks
+is **not settled by Claude Code's documentation**, and Launch Control does not
+pretend otherwise:
+
+- The [hooks reference](https://code.claude.com/docs/en/hooks#hook-locations) says
+  hook entries *merge across settings levels* — but the levels it names are user,
+  project, local and managed settings. It lists a plugin's `hooks/hooks.json` as a
+  hook location without saying the merge covers it.
+- The same page says an identical handler defined in several settings files runs
+  once, while "a plugin's or skill's copy of the same handler stays separate". That
+  reads as plugin hooks running *alongside* settings hooks rather than replacing
+  them, but it is an inference, not a statement.
+- It has not been tested. The one attempt was invalid: the repo it ran in had
+  already been migrated, so there were no project-side hooks left to observe.
+
+**On a standard install the question does not arise.** `install.sh --apply` removes
+the `SessionStart` and `Stop` entries from the target's `.claude/settings.json`
+(step 3), because those were the old copied Launch Control hooks, and leaving them
+beside the plugin's would at best fire twice.
+
+**If you keep a `SessionStart` or `Stop` hook of your own, expect this:**
+
+- Step 3 removes *every* `SessionStart` and `Stop` entry in `.claude/settings.json`,
+  not only Launch Control's — it cannot tell them apart. The dry run lists the step
+  as `would remove SessionStart/Stop entries`; if you see that line and have your
+  own hook there, put it back after `--apply` — from `git diff` if the file is
+  tracked, otherwise copy it somewhere first, since the script keeps no backup.
+  Hooks in `.claude/settings.local.json` and `~/.claude/settings.json` are not
+  touched.
+- Once it is back, the likely outcome is that both run, in parallel, in no
+  guaranteed order: two blocks of `SessionStart` context, and two `Stop` hooks
+  each able to block an exit. If instead one silences the other, that is the
+  unsettled case above — please open an issue saying which won.
+
 ## Per-repo policy
 
-The commands are identical everywhere. Everything that differs between repos lives
-in the `git` block of `.claude/launch-control.json`: base branch, merge method,
-whether auto-merge is allowed at all, and — importantly — whether **merging is
-deploying**. Where it is, `/lc:done` stops at a green PR and leaves the decision
-to you. See [`docs/config-reference.md`](docs/config-reference.md).
+The commands and hooks are identical everywhere, and are not meant to be edited
+per repo — `install.sh` treats a local edit as drift to be propagated back. The
+intended extension point is the `git` block of `.claude/launch-control.json`,
+which is where everything that differs between repos lives:
+
+| Key | What it decides |
+|---|---|
+| `baseBranch` | The branch PRs target |
+| `mergeMethod` | `squash`, `merge` or `rebase` |
+| `autoMerge` | Whether `/lc:done` may merge at all, or stops at a green PR |
+| `mergeIsDeploy` | Whether **merging is deploying**. Where it is, `/lc:done` always stops and leaves the decision to you |
+| `ciTimeoutMinutes` | How long to wait for checks before leaving the PR open rather than merging on optimism |
+| `extraChecks` | Expensive opt-in checks, each run only when its `when` matches, read literally |
+| `notes` | Standing warnings for this repo, read before anything is staged |
+
+`enabled: false` turns shipping off entirely; `/lc:done` then records without
+opening a PR. See [`docs/config-reference.md`](docs/config-reference.md).
 
 ## Status
 
