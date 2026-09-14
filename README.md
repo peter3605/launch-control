@@ -97,23 +97,23 @@ pretend otherwise:
   already been migrated, so there were no project-side hooks left to observe.
 
 **On a standard install the question does not arise.** `install.sh --apply` removes
-the `SessionStart` and `Stop` entries from the target's `.claude/settings.json`
-(step 3), because those were the old copied Launch Control hooks, and leaving them
-beside the plugin's would at best fire twice.
+the old copied Launch Control hooks from the target's `.claude/settings.json`
+(step 3), because leaving them beside the plugin's would at best fire twice.
 
 **If you keep a `SessionStart` or `Stop` hook of your own, expect this:**
 
-- Step 3 removes *every* `SessionStart` and `Stop` entry in `.claude/settings.json`,
-  not only Launch Control's — it cannot tell them apart. The dry run lists the step
-  as `would remove SessionStart/Stop entries`; if you see that line and have your
-  own hook there, put it back after `--apply` — from `git diff` if the file is
-  tracked, otherwise copy it somewhere first, since the script keeps no backup.
-  Hooks in `.claude/settings.local.json` and `~/.claude/settings.json` are not
-  touched.
-- Once it is back, the likely outcome is that both run, in parallel, in no
-  guaranteed order: two blocks of `SessionStart` context, and two `Stop` hooks
-  each able to block an exit. If instead one silences the other, that is the
-  unsettled case above — please open an issue saying which won.
+- Step 3 removes only Launch Control's own handlers: a `SessionStart` handler whose
+  command runs `.claude/hooks/session-start.sh`, and a `Stop` handler whose command
+  runs `.claude/hooks/stop.sh` — the two scripts step 4 moves away. Every other
+  handler stays, including one that shares a matcher group with ours; a group or
+  event is dropped only once nothing is left in it. The dry run lists each handler
+  by command as `would remove` or `keep`, so check that list before `--apply`.
+  If `settings.json` is not valid JSON, step 3 says so and changes nothing. Hooks
+  in `.claude/settings.local.json` and `~/.claude/settings.json` are not touched.
+- Your hook then sits beside the plugin's. The likely outcome is that both run,
+  in parallel, in no guaranteed order: two blocks of `SessionStart` context, and
+  two `Stop` hooks each able to block an exit. If instead one silences the other,
+  that is the unsettled case above — please open an issue saying which won.
 
 ## Per-repo policy
 

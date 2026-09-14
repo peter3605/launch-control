@@ -149,25 +149,67 @@ say ""
 
 # ------------------------------------------------ 3. unwire the old local hooks
 say "3. Old per-repo hook wiring in settings.json"
+# Remove only the handlers the copied layout installed, and leave every other
+# SessionStart or Stop hook alone. Every pre-plugin repo checked on 2026-09-14
+# (four product repos) wired exactly
+#   "$CLAUDE_PROJECT_DIR"/.claude/hooks/session-start.sh   under SessionStart
+#   "$CLAUDE_PROJECT_DIR"/.claude/hooks/stop.sh            under Stop
+# and step 4 moves those two scripts away, so a handler running either is ours by
+# construction. Filter per handler, not per matcher group - a user may have put
+# their own handler in the same group - and drop a group or event key only once
+# it is empty. The file is rewritten only when something is actually removed.
 if [ -f "$CLAUDE/settings.json" ]; then
-  if grep -q 'SessionStart\|Stop' "$CLAUDE/settings.json" 2>/dev/null; then
-    act "remove SessionStart/Stop entries (the plugin provides them; leaving both risks double-firing)"
-    if [ "$DRY" -eq 0 ]; then
-      python3 - "$CLAUDE/settings.json" <<'PY'
-import json, sys
-p = sys.argv[1]
+  python3 - "$CLAUDE/settings.json" "$DRY" 2>/dev/null <<'PY' || say "  !! could not read settings.json as JSON - left untouched; check its hooks by hand"
+import json, re, sys
+p, dry = sys.argv[1], sys.argv[2] == "1"
+OURS = {"SessionStart": "session-start.sh", "Stop": "stop.sh"}
 s = json.load(open(p))
-h = s.get("hooks", {})
-for k in ("SessionStart", "Stop"):
-    h.pop(k, None)
-if h: s["hooks"] = h
-else: s.pop("hooks", None)
-json.dump(s, open(p, "w"), indent=2)
+hooks = s.get("hooks")
+if not isinstance(hooks, dict):
+    print("  no hooks"); sys.exit(0)
+
+def is_ours(event, handler):
+    if not isinstance(handler, dict) or handler.get("type", "command") != "command":
+        return False
+    cmd = str(handler.get("command", "")).replace('"', "").replace("'", "").strip()
+    return re.search(r"(^|/)\.claude/hooks/" + re.escape(OURS[event]) + r"$", cmd) is not None
+
+removed = kept = 0
+for event in OURS:
+    groups = hooks.get(event)
+    if not isinstance(groups, list):
+        continue
+    left_groups = []
+    for g in groups:
+        handlers = g.get("hooks") if isinstance(g, dict) else None
+        if not isinstance(handlers, list):
+            left_groups.append(g); continue
+        left = []
+        for hd in handlers:
+            cmd = hd.get("command", "?") if isinstance(hd, dict) else "?"
+            if is_ours(event, hd):
+                removed += 1
+                print("  %s %-12s %s" % ("would remove" if dry else "removed     ", event, cmd))
+            else:
+                kept += 1
+                left.append(hd)
+                print("  keep         %-12s %s  (not Launch Control's)" % (event, cmd))
+        if left:
+            g["hooks"] = left
+            left_groups.append(g)
+    if left_groups:
+        hooks[event] = left_groups
+    else:
+        hooks.pop(event, None)
+
+if removed == 0:
+    print("  none found" if kept == 0 else "  no Launch Control entries - nothing to remove")
+    sys.exit(0)
+if not dry:
+    if hooks: s["hooks"] = hooks
+    else: s.pop("hooks", None)
+    json.dump(s, open(p, "w"), indent=2)
 PY
-    fi
-  else
-    say "  none found"
-  fi
 else
   say "  no settings.json"
 fi
