@@ -50,8 +50,21 @@ current working tree goes stale within the session and belongs in a story's
 names a story already Done on the board, since that is how in-flight state reads
 once it has outlived the flight.
 
-**`launch-control.local.json` is gitignored** and merged over the shared file at
-read time. Its keys override; its `notice` is *appended* rather than replacing.
-Put anything private there — measured spend, account or billing state, private
-infrastructure detail. This matters most in a public repo, where the shared file
-is world-readable.
+**`launch-control.local.json` is gitignored.** Put a private `notice` there —
+measured spend, account or billing state, private infrastructure detail. This
+matters most in a public repo, where the shared file is world-readable.
+
+**Only `notice` is honoured.** The file is not a general override layer, and
+nothing merges it over the shared file for the commands. What loads it:
+
+| Reader | What it takes |
+|---|---|
+| `hooks/session-start.sh` | Appends its `notice` after the shared one. It also copies every other top-level key over the shared config, but a shallow copy (a local `git` block would replace the shared one whole), and the hook only prints `project` and `prefix` from the result |
+| `skills/doctor/doctor.py` | Checks it is valid JSON, and runs the stale-story check on its `notice` |
+| `install.sh` | Creates it, moving a `notice` out of the shared file on first install. Never reads anything else from it |
+
+Every skill — at minimum `/lc:done`, `/lc:next` and `/lc:start` — reads
+`.claude/launch-control.json` directly and **never sees the local file**. A
+`git` block, a stricter `autoMerge`, private `git.notes` or a view override
+placed there changes neither shipping nor story selection, and nothing warns you.
+Policy belongs in the shared file.
