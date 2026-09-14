@@ -37,7 +37,10 @@ before submission.
 /plugin install lc@launch-control
 ```
 
-For a repo that is not on the board yet, run `/lc:plan <design doc or repo path>`
+No board yet? Run `/lc:init` in your first repo: it creates the Notion databases,
+every property and view the commands read, and that repo's config, then checks
+what it built against the schema. For every repo after that, run
+`/lc:plan <design doc or repo path> --board <first repo>/.claude/launch-control.json`
 in it: it creates the project, its road view and `.claude/launch-control.json`, and
 files the backlog. To bring over a repo that used the older copied-files layout,
 create `.claude/launch-control.json` from
@@ -49,14 +52,14 @@ and run:
 ./install.sh /path/to/your/repo --apply
 ```
 
-You will also need a board. [`docs/notion-schema.md`](docs/notion-schema.md)
-describes the two databases, the properties that carry weight, and the views each
-command reads.
+[`docs/notion-schema.md`](docs/notion-schema.md) describes the two databases, the
+properties that carry weight, and the views each command reads.
 
 ## Commands
 
 | Command | What it does |
 |---|---|
+| `/lc:init [page]` | Creates the board from nothing — both databases, every property, all seven views — checks it against the schema, and puts this repo on it |
 | `/lc:plan <doc or repo>` | Turns a design doc or a repo into a project and its whole backlog: provisions the project, checks every claim against the repo, adds the external clocks the doc never mentions, and files nothing until you confirm |
 | `/lc:next` | Hands you the next unblocked story this session can actually do, traps read out in full |
 | `/lc:start <ID>` | Binds the session to a story: status, branch, `.current-story` |
@@ -82,7 +85,7 @@ to you. See [`docs/config-reference.md`](docs/config-reference.md).
 ## Status
 
 v0.1.0, and honest about it: this was extracted from a working setup managing five
-projects, and has one real user. The board itself is provisioned by hand today; projects on it are provisioned by `/lc:plan`.
+projects, and has one real user. The board is provisioned by `/lc:init`; projects on it are provisioned by `/lc:plan`.
 
 What this is *not* is a task engine. Claude Code's native Tasks already persist
 work, track which task blocks which, and surface what just became unblocked — use
