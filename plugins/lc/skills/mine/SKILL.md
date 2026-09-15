@@ -10,7 +10,7 @@ The ranking lives in `mine.py`, in this skill's base directory. It does the cale
 
 1. Read `.claude/launch-control.json` for the board URLs.
 2. Query the **Your turn** view (`views.yourTurn`) in **view mode**, never SQL mode (SQL is billed). Page to the end with `start_cursor` until `has_more` is false — a dropped page drops the blocker edges that make the chains.
-3. Each page must reach the script as the tool returned it, a JSON object with a `results` list. A large result is already saved to disk; use that path. A small one came back inline; write it verbatim to a file in your scratchpad. Do not transcribe rows by hand.
+3. Each page must reach the script as the tool returned it. A large result is already saved to disk; use that path as it is, whether the file holds the JSON object or a list of content blocks wrapping it. A small one came back inline; write it verbatim to a file in your scratchpad. Do not transcribe rows by hand.
 4. Run `python3 <base directory>/mine.py --view <page 1> [--view <page 2> ...]`. If the user passed a project prefix, add `--prefix <PREFIX>` — the script still reads every row, because a clock in one project can block another. Without one, report across all projects, because the long-lead items rarely live in the repo you happen to be sitting in.
 5. Show the output as it printed. It has four parts:
    - **Clocks** — `Gating = External`, longest lead first, with the earliest-finish window from today through the blocker chain. These have a lead time you cannot compress, and every day one sits unstarted is a day added to the end of the project.
