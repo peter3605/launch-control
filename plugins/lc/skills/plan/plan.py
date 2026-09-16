@@ -358,8 +358,9 @@ def cmd_lint(args):
                 fail(f"{tag}: External needs leadDays [min, max], calendar days with 0 <= min <= max - "
                      "/lc:mine computes with these and lists a clock without them as unranked")
         if s.get("agent") is False and s.get("type") != "Launch Blocker":
-            warn(f"{tag}: human work typed {s.get('type')!r} - the shared yourTurn view may filter to "
-                 "Launch Blocker, which would hide it from /lc:mine")
+            warn(f"{tag}: human work typed {s.get('type')!r} - boards built before the yourTurn view "
+                 "dropped its Type filter still hide this from /lc:mine. Fix the view (board.json's "
+                 "yourTurn has the current filter), do NOT retype the story to suit it")
 
         for field in ("name", "doneWhen", "notes", "leadTime"):
             outside = re.sub(r"`[^`]*`", "", s.get(field) or "")
