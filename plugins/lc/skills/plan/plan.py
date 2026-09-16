@@ -223,6 +223,21 @@ def detect_clocks(repo, source):
                     break
         if reason:
             hits.append((clock, reason))
+
+    # A clock's blockers are filed with it, so they trigger with it: a repo that
+    # takes payments needs the entity before Stripe whether or not it says "LLC".
+    by_key = {c["key"]: c for c in load_clocks()}
+    found = {c["key"] for c, _ in hits}
+    i = 0
+    while i < len(hits):
+        clock = hits[i][0]
+        for b in clock["blockedBy"]:
+            if b not in found:
+                found.add(b)
+                hits.append((by_key[b], f"blocks {clock['key']}"))
+        i += 1
+    order = list(by_key)
+    hits.sort(key=lambda h: order.index(h[0]["key"]))
     return hits
 
 
@@ -240,6 +255,8 @@ def cmd_clocks(args):
         print(f"    Lead days:  {clock['leadDays'][0]}-{clock['leadDays'][1]} calendar")
         print(f"    Done when:  {clock['doneWhen']}")
         print(f"    Notes:      {clock['notes']}")
+        for url in clock.get("sources", []):
+            print(f"    Source:     {url}")
     print(f"\n{len(hits)} clock(s). File each as Gating External, agent unchecked, with `clock` set to its key -")
     print("or list it in clocksDeclined with the reason this launch does not need it.")
     return 0

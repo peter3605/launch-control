@@ -1,19 +1,53 @@
 {
-  "_about": "External clocks: launch steps whose duration is set by someone else. /lc:plan files each triggered clock as Gating External, Agent can do this unchecked, unprompted - a design document almost never mentions them, and every day one sits unstarted is added to the end of the launch. Lead times are typical public figures and they drift; leadDays is [min, max] in calendar days, business days converted, max being the prose's stated upper figure, and it is what /lc:mine computes with; say so in the story and link the source rather than presenting a number as a promise. Detection: `files` are globs on repo-relative paths, `content` pairs a glob with a regex matched inside those files, `text` is a regex matched against the source document. Any one match triggers the clock.",
+  "_about": "External clocks: launch steps whose duration is set by someone else. /lc:plan files each triggered clock as Gating External, Agent can do this unchecked, unprompted - a design document almost never mentions them, and every day one sits unstarted is added to the end of the launch. Lead times are typical public figures and they drift; leadDays is [min, max] in calendar days, business days converted, max being the prose's stated upper figure, and it is what /lc:mine computes with; say so in the story and link the source rather than presenting a number as a promise. Detection: `files` are globs on repo-relative paths, `content` pairs a glob with a regex matched inside those files, `text` is a regex matched against the source document. Any one match triggers the clock, and a triggered clock pulls in every clock in its blockedBy, so a detector only has to recognise its own evidence. `sources` are the pages each lead time was read from; figures marked observed have no published number behind them.",
   "clocks": [
+    {
+      "key": "business-entity",
+      "name": "Form the legal entity, get its EIN and open a business bank account",
+      "leadTime": "Filing is same-day in Wyoming online and next business day in Delaware with expedite, up to about two weeks at standard speed; an EIN is instant online; a business bank account typically takes 1-2 business days and up to 7 before escalating",
+      "leadDays": [
+        1,
+        25
+      ],
+      "epic": "Accounts and legal",
+      "estimate": "S",
+      "blockedBy": [],
+      "doneWhen": "The state's business search shows the entity as active, the IRS EIN confirmation letter (CP 575 or the online confirmation) is saved, and the business bank account can receive a deposit.",
+      "notes": "Only needed to sell as a COMPANY. An individual can enroll with Apple, sign the Paid Apps Agreement and activate Stripe as a sole proprietor on an SSN - but the App Store then lists a personal legal name as the seller, and in the EU publishes a personal address, phone and email. Decline this clock only with that decision stated, and decline `duns` with it. Apple accepts corporations, LLCs and partnerships; DBAs, trade names and sole proprietorships are not accepted as organizations. A founder with no SSN or ITIN cannot use the online EIN form: by phone it is same-day, by fax up to 4 business days, by mail about 4 weeks. Delaware returns non-expedited documents by post. The entity's exact legal name and address are what D-U-N-S, Apple, Stripe and the bank will all check against each other, so settle them here.",
+      "sources": [
+        "https://corp.delaware.gov/expserv/",
+        "https://sos.wyo.gov/faqs.aspx?root=BUS",
+        "https://stripe.com/resources/more/how-long-does-it-take-to-incorporate-in-delaware",
+        "https://www.irs.gov/instructions/iss4",
+        "https://developer.apple.com/help/account/membership/D-U-N-S/",
+        "https://support.stripe.com/questions/signing-up-for-stripe-as-a-sole-proprietor-without-employer-id-number"
+      ],
+      "detect": {
+        "text": [
+          "\\bLLC\\b",
+          "\\bC-?corp",
+          "incorporat",
+          "legal entity",
+          "business entity",
+          "\\bEIN\\b"
+        ]
+      }
+    },
     {
       "key": "duns",
       "name": "Get a D-U-N-S number for the company",
-      "leadTime": "About 5-7 business days after the request",
+      "leadTime": "Apple says allow up to 5 business days from D&B plus up to 2 more before Apple sees it; when D&B must create a new record it states up to 30 business days",
       "leadDays": [
         7,
-        9
+        46
       ],
       "epic": "Accounts and legal",
       "estimate": "XS",
-      "blockedBy": [],
+      "blockedBy": [
+        "business-entity"
+      ],
       "doneWhen": "Dun & Bradstreet has issued a nine-digit D-U-N-S number for the legal entity, and Apple's D-U-N-S lookup tool returns that entity with the exact legal name and address that the Apple enrollment form will use.",
-      "notes": "Only needed to enroll as an ORGANIZATION. An individual enrollment skips it, but then the seller name on the App Store is a personal name - decline this clock only with that decision stated. Request it through Apple's own lookup tool, not a paid D&B service: the free route is the one Apple accepts. The name and address must match the enrollment form character for character or enrollment stalls.",
+      "notes": "Only needed to enroll as an ORGANIZATION. An individual enrollment skips it, but then the seller name on the App Store is a personal name - decline this clock only with that decision stated. Request it through Apple's own lookup tool, not a paid D&B service: the free route is the one Apple accepts. The name and address must match the enrollment form character for character or enrollment stalls. If the lookup finds no record, D&B creates one and may phone to confirm details - that is the 30-business-day case, and Apple says to email D&B after two weeks. D&B sells an expedited service guaranteed in eight business days; Apple does not require it. The D-U-N-S address is what Apple publishes as the trader address on EU product pages, so correct it at D&B before enrolling, and allow another 2 business days for Apple to see the correction.",
       "detect": {
         "files": [
           "*.xcodeproj",
@@ -39,7 +73,11 @@
           "TestFlight",
           "D-U-N-S"
         ]
-      }
+      },
+      "sources": [
+        "https://developer.apple.com/help/account/membership/D-U-N-S/",
+        "https://www.dnb.com/en-us/smb/duns/get-a-duns.html"
+      ]
     },
     {
       "key": "apple-enroll",
@@ -93,10 +131,11 @@
       "epic": "Accounts and legal",
       "estimate": "S",
       "blockedBy": [
-        "apple-enroll"
+        "apple-enroll",
+        "business-entity"
       ],
       "doneWhen": "App Store Connect > Business shows the Paid Apps Agreement as Active, with banking and tax forms marked complete.",
-      "notes": "In-app purchases and subscriptions cannot be tested in sandbox, let alone sold, until this agreement is Active. It is the step most often discovered the week of submission.",
+      "notes": "In-app purchases and subscriptions cannot be tested in sandbox, let alone sold, until this agreement is Active. It is the step most often discovered the week of submission. Banking needs the account that will receive payouts: for a company, the entity's business bank account. An individual enrollment can use a personal account, and then `business-entity` is declined with it.",
       "detect": {
         "files": [
           "*.storekit"
@@ -130,7 +169,8 @@
       "epic": "Beta and submission",
       "estimate": "S",
       "blockedBy": [
-        "apple-enroll"
+        "apple-enroll",
+        "export-compliance"
       ],
       "doneWhen": "The build shows as Ready to Test for an external TestFlight group in App Store Connect, and at least one external tester has installed it.",
       "notes": "Internal testers need no review; external testers do, and the first build of each version is reviewed. Include demo-account credentials in the review notes if the app has a login, or it is rejected.",
@@ -162,7 +202,9 @@
       "epic": "Beta and submission",
       "estimate": "M",
       "blockedBy": [
-        "apple-enroll"
+        "apple-enroll",
+        "export-compliance",
+        "eu-dsa-trader"
       ],
       "doneWhen": "App Store Connect shows the version as Ready for Distribution (or Pending Developer Release).",
       "notes": "Plan for at least one rejection. The common first-submission rejections are a missing account-deletion path for apps with sign-up, missing Sign in with Apple when any third-party login is offered, placeholder content, and privacy nutrition labels that do not match what the app collects.",
@@ -181,6 +223,69 @@
           "App Store",
           "\\biOS\\b",
           "iPhone"
+        ]
+      }
+    },
+    {
+      "key": "export-compliance",
+      "name": "Declare the app's encryption for export compliance",
+      "leadTime": "Instant when the app uses only exempt encryption and says so in Info.plist; when Apple needs documentation it expects to clear it in about two business days",
+      "leadDays": [
+        0,
+        4
+      ],
+      "epic": "Beta and submission",
+      "estimate": "XS",
+      "blockedBy": [
+        "apple-enroll"
+      ],
+      "doneWhen": "The app's Info.plist (or its `project.yml` / build settings) sets `ITSAppUsesNonExemptEncryption`, and the latest build in App Store Connect > TestFlight shows no Missing Compliance status.",
+      "notes": "Every build is asked this question; without the Info.plist key each upload sits at Missing Compliance until someone answers it by hand. Third-party libraries count toward the answer. Encryption used only through the OS and HTTPS is exempt. If Apple approves documentation it returns a code that goes in `ITSEncryptionExportComplianceCode`. Non-exempt encryption distributed in France needs an ANSSI declaration filed a month before release, and the clock restarts on an incomplete file - add 30 days to the max if that applies. A US self-classification report, where one is needed at all, is a February 1 deadline rather than a lead time. Google Play asks only for an acknowledgement when the app is created.",
+      "sources": [
+        "https://developer.apple.com/help/app-store-connect/manage-app-information/determine-and-upload-app-encryption-documentation/",
+        "https://developer.apple.com/documentation/security/complying-with-encryption-export-regulations",
+        "https://developer.apple.com/help/app-store-connect/test-a-beta-version/provide-export-compliance-information-for-beta-builds/",
+        "https://www.legifrance.gouv.fr/jorf/id/JORFTEXT000000646995"
+      ],
+      "detect": {
+        "files": [
+          "*.xcodeproj",
+          "*.xcworkspace"
+        ],
+        "content": [
+          [
+            "app.json",
+            "\"ios\"\\s*:"
+          ]
+        ]
+      }
+    },
+    {
+      "key": "eu-dsa-trader",
+      "name": "Declare and verify EU trader status for the store listing",
+      "leadTime": "No published figure; declaring is minutes, and verification when Apple asks for documents is observed to take a few business days",
+      "leadDays": [
+        1,
+        7
+      ],
+      "epic": "Accounts and legal",
+      "estimate": "XS",
+      "blockedBy": [],
+      "doneWhen": "App Store Connect > Business shows a trader status for the account (verified, if it is a trader), and the app's availability includes the EU storefronts; for Google Play, Play Console shows the developer identity and contact details as verified.",
+      "notes": "Since 17 February 2025 Apple removes apps from EU storefronts until trader status is provided and, if needed, verified - and apps ship to every territory by default, so an app without it is quietly missing from the EU rather than rejected. A trader's address, phone and email are published on the EU product page: an organization's address comes from its D-U-N-S record, an individual's is typed in (a P.O. box is accepted - use one rather than a home address). On Google Play the public contact details come from mandatory developer identity verification, which Google says may take a few days; a separate Play trader declaration is reported by secondary sources but was not confirmed from a Google page. Decline only if the app will not be distributed in the EU, and say so.",
+      "sources": [
+        "https://developer.apple.com/news/?id=einwn76m",
+        "https://developer.apple.com/help/app-store-connect/manage-compliance-information/manage-european-union-digital-services-act-trader-requirements/",
+        "https://support.google.com/googleplay/android-developer/answer/14177239",
+        "https://www.webtonative.com/blog/eu-digital-services-act-compliance-ios-app"
+      ],
+      "detect": {
+        "text": [
+          "Digital Services Act",
+          "\\bDSA\\b",
+          "trader status",
+          "European Union",
+          "\\bEU\\b"
         ]
       }
     },
@@ -226,6 +331,46 @@
       }
     },
     {
+      "key": "play-data-safety",
+      "name": "Complete and pass review of the Google Play Data safety form",
+      "leadTime": "Reviewed as part of app review, which Google says can take up to 7 days or longer for apps given extended review",
+      "leadDays": [
+        0,
+        7
+      ],
+      "epic": "Beta and submission",
+      "estimate": "S",
+      "blockedBy": [
+        "play-dev-account"
+      ],
+      "doneWhen": "Play Console > App content shows Data safety as completed with no policy issue, and a build has been published to the closed testing track.",
+      "notes": "Internal testing is exempt, so the requirement surfaces only when the first build is promoted to closed testing - which is the start of the 14-day clock. The form must declare what third-party SDKs collect (analytics, crash reporting, ads), not only the app's own code; a mismatch found later blocks updates or removes the app. It needs a privacy policy URL.",
+      "sources": [
+        "https://support.google.com/googleplay/android-developer/answer/10787469",
+        "https://support.google.com/googleplay/android-developer/answer/9859751"
+      ],
+      "detect": {
+        "files": [
+          "android/app/build.gradle",
+          "android/app/build.gradle.kts"
+        ],
+        "content": [
+          [
+            "*.gradle",
+            "com\\.android\\.application"
+          ],
+          [
+            "*.gradle.kts",
+            "com\\.android\\.application"
+          ],
+          [
+            "app.json",
+            "\"android\"\\s*:"
+          ]
+        ]
+      }
+    },
+    {
       "key": "play-closed-testing",
       "name": "Run the Google Play closed test required before production access",
       "leadTime": "At least 14 consecutive days with 12 or more opted-in testers, then a production-access review of up to about 7 days",
@@ -236,7 +381,9 @@
       "epic": "Beta and submission",
       "estimate": "M",
       "blockedBy": [
-        "play-dev-account"
+        "play-dev-account",
+        "play-data-safety",
+        "eu-dsa-trader"
       ],
       "doneWhen": "Play Console shows production access granted for the app (the Production track can be published to).",
       "notes": "Applies to personal developer accounts created after November 2023. The 14 days only count while the testers remain opted in - recruit more than 12, because one dropping out can reset it. This is the longest fixed clock in an Android launch; start it with the first installable build, not the finished one.",
@@ -267,6 +414,152 @@
       }
     },
     {
+      "key": "domain",
+      "name": "Register the domain and delegate its DNS",
+      "leadTime": "A new registration usually resolves within minutes; moving a domain to new nameservers takes up to two days, because registrars set a 24-48 hour TTL on NS records and resolvers cache them",
+      "leadDays": [
+        0,
+        2
+      ],
+      "epic": "Third-party access",
+      "estimate": "XS",
+      "blockedBy": [],
+      "doneWhen": "`dig +short NS <domain>` from a public resolver (for example `@1.1.1.1`) returns the intended nameservers, and `dig +short <domain>` returns the production address.",
+      "notes": "Answer the registrant verification email ICANN requires, or the registrar suspends the domain - the window is days, not weeks, and it goes to whatever address was typed at checkout. A new registration cannot move to another registrar for 60 days, so register it where the DNS will be managed. Lowering a TTL after the change does not speed it up. `.app`, `.dev` and other Google TLDs are on the HSTS preload list: nothing loads over plain HTTP, so the TLS certificate is part of this, not a later nicety. Store listings, OAuth verification and email authentication all need a domain you control, which is why it heads their chains.",
+      "sources": [
+        "https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/troubleshooting-new-dns-settings-not-in-effect.html",
+        "https://www.icann.org/en/contracted-parties/accredited-registrars/resources/domain-name-transfers/policy",
+        "https://www.registry.google/domains/app/"
+      ],
+      "detect": {
+        "files": [
+          "CNAME",
+          "Caddyfile"
+        ],
+        "content": [
+          [
+            "*.tf",
+            "aws_route53_zone|aws_route53_record|cloudflare_record|cloudflare_dns_record|cloudflare_zone|google_dns_managed_zone|azurerm_dns_zone|aws_acm_certificate|aws_ses_domain_identity|aws_sesv2_email_identity"
+          ],
+          [
+            "wrangler.toml",
+            "custom_domain\\s*=\\s*true|^\\s*routes?\\s*="
+          ],
+          [
+            "docker-compose*.yml",
+            "traefik\\.http\\.routers\\.[^=]*\\.rule=Host"
+          ]
+        ],
+        "text": [
+          "custom domain",
+          "domain name",
+          "\\bDNS\\b",
+          "nameservers?"
+        ]
+      }
+    },
+    {
+      "key": "tls-certificate",
+      "name": "Get the TLS certificate issued for the production domain",
+      "leadTime": "Automated DV certificates (Let's Encrypt, AWS ACM) issue within minutes of DNS being right, and ACM gives up after 72 hours; commercial OV certificates take about 1-3 days and EV 1-5 days or more",
+      "leadDays": [
+        0,
+        3
+      ],
+      "epic": "Third-party access",
+      "estimate": "XS",
+      "blockedBy": [
+        "domain"
+      ],
+      "doneWhen": "`curl -sI https://<domain>` completes without a certificate error, and `openssl s_client -connect <domain>:443 -servername <domain>` shows a certificate for that name from a public CA.",
+      "notes": "Only a clock when the domain is custom - a platform subdomain (`*.workers.dev`, `*.vercel.app`, a load balancer's own name) arrives with a certificate. ACM marks a request Validation timed out after 72 hours and a new request starts from zero. Let's Encrypt allows 5 failed validations per name per hour, so a misconfigured DNS loop locks issuance out for a while. OV and EV need the legal entity and a phone number listed in public directories; use [1, 7] lead days if filing one. Let's Encrypt's default lifetime drops to 64 days in February 2027 and 45 in 2028, so renewal must be automated.",
+      "sources": [
+        "https://docs.aws.amazon.com/acm/latest/userguide/dns-validation.html",
+        "https://letsencrypt.org/docs/rate-limits/",
+        "https://www.sectigo.com/blog/dv-ov-ev-ssl-certificates"
+      ],
+      "detect": {
+        "files": [
+          "Caddyfile"
+        ],
+        "content": [
+          [
+            "*.tf",
+            "aws_acm_certificate|google_compute_managed_ssl_certificate|azurerm_app_service_managed_certificate|acme_certificate"
+          ],
+          [
+            "*.y*ml",
+            "cert-manager\\.io|certbot|letsencrypt|certresolver"
+          ],
+          [
+            "*.conf",
+            "^\\s*ssl_certificate\\s"
+          ]
+        ],
+        "text": [
+          "TLS certificate",
+          "SSL certificate",
+          "Let's Encrypt"
+        ]
+      }
+    },
+    {
+      "key": "email-sender",
+      "name": "Get the transactional email provider approved and the sending domain authenticated",
+      "leadTime": "Postmark reviews new accounts in under 24 hours on weekdays; SendGrid vets new accounts and verifies DNS within 48 hours; Resend often verifies a domain in 15 minutes but allows 72; Mailgun says 24-48 hours for DNS and publishes no figure for business verification",
+      "leadDays": [
+        0,
+        3
+      ],
+      "epic": "Third-party access",
+      "estimate": "S",
+      "blockedBy": [
+        "domain"
+      ],
+      "doneWhen": "The provider's dashboard shows the account approved (out of test, sandbox or review mode) and the sending domain verified for SPF and DKIM, and a message sent to an outside Gmail address arrives in the inbox with `spf=pass` and `dkim=pass` in its headers.",
+      "notes": "Every provider lets a pending account send to itself, so it works in testing and fails for the first real user. Postmark pending accounts reach only verified domains and it rejects marketing use; SendGrid may email questions within hours of signup and holds the account until answered; Resend fails a domain after 72 hours and it must be restarted; Mailgun's sandbox reaches 5 authorised recipients and 300 messages a day. Gmail requires SPF or DKIM from every sender, and DMARC plus one-click unsubscribe from anyone who ever sends 5,000 a day - that classification is permanent - with rejections since November 2025, so publish a DMARC record from the start.",
+      "sources": [
+        "https://postmarkapp.com/support/article/1084-how-does-the-account-approval-process-work",
+        "https://support.sendgrid.com/hc/en-us/articles/360041790293-Account-Under-Review",
+        "https://www.twilio.com/docs/sendgrid/ui/account-and-settings/how-to-set-up-domain-authentication",
+        "https://resend.com/docs/add-a-domain",
+        "https://documentation.mailgun.com/docs/mailgun/user-manual/domains/domains-verify",
+        "https://support.google.com/mail/answer/81126"
+      ],
+      "detect": {
+        "content": [
+          [
+            "package.json",
+            "\"(@sendgrid/mail|postmark|resend|mailgun\\.js|mailgun-js)\"\\s*:"
+          ],
+          [
+            "requirements*.txt",
+            "^(sendgrid|postmarker|resend|mailgun)\\b"
+          ],
+          [
+            "pyproject.toml",
+            "[\"'](sendgrid|postmarker|resend|mailgun)\\b"
+          ],
+          [
+            "Gemfile",
+            "gem\\s+['\"](sendgrid-ruby|postmark|postmark-rails|resend|mailgun-ruby)['\"]"
+          ],
+          [
+            "go.mod",
+            "sendgrid/sendgrid-go|keighl/postmark|mrz1836/postmark|resend/resend-go|mailgun/mailgun-go"
+          ]
+        ],
+        "text": [
+          "SendGrid",
+          "Postmark",
+          "Mailgun",
+          "Resend API",
+          "resend\\.com",
+          "transactional email"
+        ]
+      }
+    },
+    {
       "key": "ses-production",
       "name": "Get Amazon SES out of the sandbox",
       "leadTime": "About one business day per request; rejections are common and each resubmission waits again",
@@ -276,9 +569,11 @@
       ],
       "epic": "Third-party access",
       "estimate": "S",
-      "blockedBy": [],
+      "blockedBy": [
+        "domain"
+      ],
       "doneWhen": "`aws sesv2 get-account --region <region>` returns `\"ProductionAccessEnabled\": true` for the region the app sends from.",
-      "notes": "In the sandbox SES only delivers to verified addresses, so everything looks fine in testing and fails for the first real user. The request is per region. Describe the bounce and complaint handling concretely in the request - vague requests are the ones rejected.",
+      "notes": "In the sandbox SES only delivers to verified addresses, so everything looks fine in testing and fails for the first real user. The request is per region. Describe the bounce and complaint handling concretely in the request - vague requests are the ones rejected. Sending from a domain you do not control fails DMARC wherever that domain publishes p=reject, so verify your own domain as the identity.",
       "detect": {
         "content": [
           [
@@ -291,11 +586,7 @@
           ],
           [
             "*.py",
-            "client\\(['\"]sesv?2?['\"]"
-          ],
-          [
-            "requirements*.txt",
-            "boto3"
+            "client\\(\\s*['\"]sesv?2?['\"]|service_name\\s*=\\s*['\"]sesv?2?['\"]"
           ],
           [
             "go.mod",
@@ -318,9 +609,11 @@
       ],
       "epic": "Third-party access",
       "estimate": "S",
-      "blockedBy": [],
+      "blockedBy": [
+        "business-entity"
+      ],
       "doneWhen": "The Stripe Dashboard shows the account as activated with charges and payouts enabled, and a live-mode API key exists.",
-      "notes": "Needs business details, a bank account and identity verification. Some business categories trigger manual review. Test-mode keys work regardless, which is why this is found late.",
+      "notes": "Needs business details, a bank account and identity verification. Some business categories trigger manual review. Test-mode keys work regardless, which is why this is found late. A company activates with its EIN and business bank account, which is why the entity comes first. A US sole proprietor can activate on an SSN with no entity - decline `business-entity` with that stated.",
       "detect": {
         "content": [
           [
@@ -384,16 +677,18 @@
     {
       "key": "google-oauth-verification",
       "name": "Pass Google OAuth app verification",
-      "leadTime": "A few days for sensitive scopes; several weeks or more for restricted scopes, which also need a third-party security assessment",
+      "leadTime": "Google estimates 2-3 business days for brand verification and 10 for sensitive scopes; restricted scopes take about 6 weeks plus a CASA security assessment of 2-3 weeks (tier 2) or 4-6 weeks (tier 3)",
       "leadDays": [
         3,
-        42
+        84
       ],
       "epic": "Third-party access",
       "estimate": "M",
-      "blockedBy": [],
+      "blockedBy": [
+        "domain"
+      ],
       "doneWhen": "Google Cloud Console > OAuth consent screen shows the app as In production with verification status Verified.",
-      "notes": "Unverified apps are capped at 100 users and show an 'unverified app' warning. Basic sign-in scopes (openid, email, profile) do not need verification - check which scopes the code actually requests before filing this.",
+      "notes": "Unverified apps are capped at 100 users in total and show an 'unverified app' warning. Basic sign-in scopes (openid, email, profile) do not need verification - check which scopes the code actually requests before filing this. Restricted scopes (most of Gmail and Drive) need the CASA assessment from an authorised lab, at a fee Google puts at $500-$4,500, and it is repeated every 12 months from the Letter of Assessment date. The max assumes verification and a tier-3 assessment run back to back. Prerequisites that restart the clock when wrong: authorised domains verified in Search Console, a public homepage, a privacy policy on the same domain, and a demo video of the consent flow.",
       "detect": {
         "content": [
           [
@@ -407,7 +702,12 @@
           "Google Calendar API",
           "OAuth verification"
         ]
-      }
+      },
+      "sources": [
+        "https://support.google.com/cloud/answer/13463817",
+        "https://developers.google.com/health/app-verification",
+        "https://developers.google.com/identity/protocols/oauth2/production-readiness/restricted-scope-verification"
+      ]
     },
     {
       "key": "meta-app-review",
@@ -470,23 +770,27 @@
     {
       "key": "trademark",
       "name": "File the trademark application for the product name",
-      "leadTime": "Months: a USPTO first examination typically takes six months or more",
+      "leadTime": "The serial number is issued on the confirmation page the moment the application is filed; the USPTO's first examination averages about 4 months and registration about 10, and both run after launch",
       "leadDays": [
-        180,
-        365
+        0,
+        0
       ],
       "epic": "Accounts and legal",
       "estimate": "M",
       "blockedBy": [],
       "doneWhen": "The USPTO (or relevant office) has issued a serial number for the application, recorded in this story's Last session.",
-      "notes": "Filing does not block launching, but a conflict found after launch means a rename. At minimum, run the search before the name is printed on a store listing.",
+      "notes": "Filing does not block launching, so lead days are 0 - the months of examination are deliberately not counted, because counting them makes every other clock in the project look like it has half a year of slack. What matters before launch is the clearance search: at minimum the USPTO database and a web search for common-law use, before the name is printed on a store listing or a domain is bought. A conflict found after launch means a rename, and filing fees are not refunded. Choose the basis (use in commerce, which needs a specimen, or intent to use) and word the goods and services carefully - they cannot be broadened later. If an entity will own the mark, file in its name.",
       "detect": {
         "text": [
           "trademark",
           "\\bUSPTO\\b",
           "brand name"
         ]
-      }
+      },
+      "sources": [
+        "https://www.uspto.gov/trademarks/application-timeline",
+        "https://www.uspto.gov/trademarks/search/comprehensive-clearance-search-similar-trademarks"
+      ]
     }
   ]
 }

@@ -4,9 +4,10 @@ A backlog for people shipping real software with coding agents.
 
 Most agent task tools help an agent decide what to write next. This one is built
 around a different observation: **when a solo developer is late, it is usually not
-because code is unwritten.** It is because a D-U-N-S number takes seven business
-days, an SES production request is still in sandbox, an App Store review now runs
-one to four weeks, and nobody started any of them.
+because code is unwritten.** It is because a D-U-N-S number can take six weeks
+when Dun & Bradstreet has never heard of the company, an SES production request
+is still in sandbox, an App Store review now runs one to four weeks, and nobody
+started any of them.
 
 So Launch Control tracks two kinds of work in one board:
 
