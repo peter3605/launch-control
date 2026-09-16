@@ -3,8 +3,9 @@
 
     mine.py --view FILE [--view FILE ...] [--prefix APP] [--today YYYY-MM-DD]
 
-Each FILE is one page of a view-mode query of the Your turn view, saved as the
-tool returned it: a JSON object with a "results" list. Pass every page.
+Each FILE is one page of a view-mode query of the Your turn view, as the tool
+returned it: a JSON object with a "results" list, or the list of content blocks
+the tool saves a large result as. Pass every page.
 
 Exits 1 if the rows cannot be ranked honestly (a dependency cycle, or no rows),
 0 otherwise. Rows it cannot rank are listed, never guessed.
@@ -26,8 +27,14 @@ on the max bound: the item whose delay moves a launch soonest and furthest.
 import argparse
 import datetime
 import json
+import os
 import re
 import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.dont_write_bytecode = True  # importing doctor must not litter the installed plugin
+sys.path.insert(0, os.path.join(HERE, "..", "doctor"))
+from doctor import load_result  # noqa: E402
 
 EST_ORDER = {"XS": 0, "S": 1, "M": 2, "L": 3, "XL": 4}
 
@@ -73,8 +80,7 @@ def span(lo, hi):
 def load(paths):
     rows = []
     for path in paths:
-        with open(path) as f:
-            data = json.load(f)
+        data = load_result(path)
         if data.get("has_more"):
             print(f"  WARN  {path} says has_more - pass every page, or rows are missing", file=sys.stderr)
         rows.extend(data.get("results", []))

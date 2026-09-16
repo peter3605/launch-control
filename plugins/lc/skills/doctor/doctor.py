@@ -48,6 +48,20 @@ def load_json(path):
         return json.load(f)
 
 
+def unwrap_saved(data):
+    """A large MCP tool result is saved to disk as a list of content blocks whose
+    text is the payload. Return that text; return anything else unchanged."""
+    if isinstance(data, list):
+        return "".join(b.get("text", "") for b in data if isinstance(b, dict))
+    return data
+
+
+def load_result(path):
+    """A saved query result as a JSON object, from either form the tool writes."""
+    data = unwrap_saved(load_json(path))
+    return json.loads(data) if isinstance(data, str) else data
+
+
 def notion_id(url):
     """The 32-hex database id in a notion.so URL, dashes stripped."""
     path = (url or "").split("?", 1)[0].replace("-", "")
@@ -79,10 +93,7 @@ def read_page(page, base):
         return None, False, str(page["error"])
     if "file" in page:
         path = os.path.join(base, page["file"])
-        raw = load_json(path)
-        # A saved MCP tool result is a list of content blocks whose text is the JSON.
-        if isinstance(raw, list):
-            raw = json.loads("".join(b.get("text", "") for b in raw if isinstance(b, dict)))
+        raw = load_result(path)
         rows = raw.get("results", [])
         rows = [(str(r.get("Story ID") or ""), str(r.get("Status") or "")) for r in rows]
         return rows, bool(raw.get("has_more")), None
