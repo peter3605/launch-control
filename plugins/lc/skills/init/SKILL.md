@@ -20,6 +20,27 @@ Three things make this go wrong quietly:
 
 Stop at the first failure and say which check failed.
 
+0. **Is Notion actually reachable?** Do this before anything else, including the repo
+   checks - it is the one prerequisite that cannot be fixed from inside this repo, and
+   the failure it produces later is an opaque tool error rather than a diagnosis. Fetch
+   the connected workspace (`fetch` with id `self`). If that call is unavailable or
+   errors, **stop and write nothing** - no Notion objects, no `.claude/lc-init/`, no
+   config. Say which of the two it was, because the fix differs:
+   - **No Notion tool in this session at all.** The connector is not installed or not
+     enabled. Say so in those words - name the Notion connector, do not relay a raw
+     "tool not found". Tell them to check with `claude mcp list` and point at the
+     prerequisites section of the README.
+   - **The tool is there but the call fails or returns nothing.** The connector is
+     installed but not authorised, or it has been given no access to any page. Say
+     which is likelier from the error, and that the fix is in Notion (`···` >
+     Add connections on the parent page) or the OAuth flow in `/mcp` - not in this repo.
+
+   There is no way for a skill to ask Claude Code whether an MCP server is connected,
+   so this call *is* the check. Do not skip it on the grounds that a later step would
+   fail anyway: a later failure happens after the run has started writing.
+
+   Repeat this fetch if the user fixes something and asks to continue; do not carry a
+   stale pass forward from earlier in the session.
 1. **Target repo** is this session's project directory. Run `python3 <base directory>/init.py preflight --repo <target>` (add `--new-board` only if the user passed it). A FAIL means stop; relay its line. If it reports an earlier run, go to **Resuming**.
 2. **The parent page.** If the user passed a page URL, fetch it. It must resolve, and it must hold no database - a page that already has a Stories or Projects database is a board, and init does not build a second one on top of it. With no URL, propose creating a private workspace-level page titled `Launch Control` (draft mode) and say it can be moved later.
 3. **Key and prefix.** Key: `--key`, or the repo directory name, lowercased. Prefix: `--prefix`, or 2-6 capitals drawn from the key. On a brand-new board nothing can collide, so there is nothing to query.
