@@ -30,6 +30,65 @@ requiring evidence to close anything. Marking something Done that is not is wors
 than leaving it open: it removes the only check that would have caught the gap
 before submission.
 
+## What you need first
+
+Launch Control is a thin layer over two things it does not ship: Claude Code, and a
+Notion board reached through Notion's MCP connector. If the connector is missing, the
+first thing you run after installing fails on its first tool call. Check this list
+before the install commands below, not after.
+
+| You need | Why | What happens without it |
+|---|---|---|
+| **Claude Code** | The commands are Claude Code skills; the two hooks are Claude Code hooks | Nothing to install into |
+| **A Notion account** | The board *is* a Notion database. The free plan is enough — every command queries views in view mode, which is unmetered; nothing here uses billed SQL mode | No board |
+| **Notion connected as an MCP connector in Claude Code** | Every single command reads or writes the board through Notion's MCP tools. There is no local or offline mode | `/lc:init` stops at pre-flight and names this |
+| **That connector authorised on the page the board lives under** | Notion connectors see only the pages you share with them. Connected-but-unshared fails the same way as not connected | `/lc:init` stops at pre-flight and names this |
+| **`python3` on `PATH`** | Every skill shells out to it; so do both hooks and `install.sh` | `install.sh` stops at step 0. Hooks fail quietly |
+| **`git`** | `/lc:start` cuts the branch, `/lc:done` commits | `/lc:start` and `/lc:done` |
+| **`gh`, authenticated** | `/lc:done` only — it pushes, opens the PR, and reads the check rollup | `/lc:done` only. Everything else works |
+
+Connecting Notion is three steps, and it is worth knowing they are three, because
+stopping after the first is the common way to arrive at `/lc:init` with a connector
+that does not work:
+
+1. **Configure the server.**
+
+   ```
+   claude mcp add --transport http notion https://mcp.notion.com/mcp
+   ```
+
+   Add `--scope user` to have it available in every repo rather than just this one.
+2. **Authorise it.** Run `/mcp` inside Claude Code (or `claude mcp login notion`) and
+   complete Notion's OAuth flow in the browser. Adding the server is configuration, not
+   access — this step is what actually grants it.
+3. **Share the page.** In Notion, open the page you want the board to live under, and
+   use its `···` menu → **Add connections** to add the integration. Notion connectors
+   see only what you share with them, and access cascades to everything inside that
+   page. Skipping this is the failure that looks like a working connector returning
+   nothing.
+
+Confirm it before you run anything: `claude mcp list` should show `notion` as
+connected. Notion's own setup guide is at
+[developers.notion.com/guides/mcp/get-started-with-mcp](https://developers.notion.com/guides/mcp/get-started-with-mcp),
+and that page, not this one, is the current truth about the endpoint and the auth flow.
+
+**How long to a first working command.** If Notion is already connected: about five
+minutes — install the plugin, run `/lc:init`, watch it provision. From nothing,
+budget half an hour, and note that most of it is Notion-side account and connector
+setup that has nothing to do with this plugin. `/lc:init` itself is a few minutes of
+agent turns, because it creates two databases and seven views and then reads every one
+of them back to check it. Filing an actual backlog with `/lc:plan` is a separate
+session again, and a longer one — it reads your design doc or repo before it proposes
+anything.
+
+**What the Notion dependency costs you.** Say this out loud before you commit to it:
+your story titles, acceptance criteria, trap notes and per-session records all live in
+a third-party SaaS, on their servers, under their terms. For an unreleased product
+that is a real disclosure decision, and this repo would rather you made it now than
+discover it later. There is no self-hosted backend and no export command yet. The
+board is a plain Notion database, so Notion's own export gets your data out, but
+nothing here re-imports it.
+
 ## Install
 
 ```
