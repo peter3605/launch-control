@@ -1,10 +1,12 @@
 ---
 name: mine
-description: Show the launch blockers only a human can do, longest lead time first
+description: Show the work only a human can do, longest lead time first
 argument-hint: [project prefix, optional]
 ---
 
 Report the work that a coding session **cannot** do — the tasks that need a human at a keyboard, a credit card, a login, or a third party. These are the ones that actually gate a launch, and nothing else in this system surfaces them.
+
+The view behind this is filtered on **Agent can do this** and nothing else, so it carries human work of every Type — a Chore that needs a login belongs here as much as a Launch Blocker. Type is in the rows if you want to mention it; do not use it to drop anything.
 
 The ranking lives in `mine.py`, in this skill's base directory. It does the calendar arithmetic and names the pick, so the recommendation is the script's, not a judgement made by eye. It cannot reach Notion, so you query the view and hand it the results.
 
