@@ -26,6 +26,26 @@ DRY=1
 say() { printf '%s\n' "$*"; }
 act() { if [ "$DRY" -eq 1 ]; then say "  would $*"; else say "  $*"; fi; }
 
+# Print a file with its YAML frontmatter removed, or whole if it has none.
+# This was a sed one-liner until 2026-09-15. BSD sed - the sed on every macOS -
+# rejects "1{/^---$/!q};1,/^---$/d" with "extra characters at the end of q command",
+# and the caller sent that error to /dev/null, so BOTH sides of the drift compare
+# came back empty, every file looked identical, and the check silently passed on
+# every edit it exists to catch. Use python3, which the rest of this script needs
+# anyway, rather than a sed dialect that differs between GNU and BSD.
+strip_frontmatter() {
+  python3 -c "
+import sys
+lines = open(sys.argv[1], encoding='utf-8', errors='replace').read().split('\n')
+if lines and lines[0].strip() == '---':
+    for i in range(1, len(lines)):
+        if lines[i].strip() == '---':
+            sys.stdout.write('\n'.join(lines[i+1:])); sys.exit(0)
+    sys.exit(0)  # unterminated frontmatter: no body
+sys.stdout.write('\n'.join(lines))
+" "$1" 2>/dev/null || true
+}
+
 say "Launch Control -> $TARGET"
 [ "$DRY" -eq 1 ] && say "(dry run - pass --apply to make these changes)"
 say ""
@@ -78,30 +98,78 @@ say ""
 # installed from. Without one we cannot tell "you edited this locally" from
 # "the plugin moved on since you copied it" - and reporting the second as the
 # first is crying wolf on every single install.
+#
+# A baseline also has to MATCH the plugin to mean anything. Diffing a repo stamped
+# v0.1.0 against v0.5.1 surfaces every change the PLUGIN made since, reports them as
+# local edits, and refuses. That refusal is permanent: the stamp only advances in
+# step 6, which this check runs before, so the repo can never reach a baseline that
+# would let it pass. An older baseline is an un-run migration, not drift - treat it
+# as no baseline and fall through, exactly as the comment above says to.
 PLUGIN_VERSION="$(python3 -c "import json;print(json.load(open('$PLUGIN/.claude-plugin/plugin.json')).get('version',''))" 2>/dev/null || true)"
 BASELINE="$(python3 -c "import json;print(json.load(open('$CLAUDE/launch-control.json')).get('installedVersion','') or '')" 2>/dev/null || true)"
+# same | older | newer | unknown (unset, or not a dotted-numeric version)
+BASELINE_REL="$(python3 -c "
+import sys
+def parse(v):
+    out = []
+    for seg in v.strip().split('.'):
+        digits = ''
+        for ch in seg:
+            if ch.isdigit(): digits += ch
+            else: break
+        if not digits: return None
+        out.append(int(digits))
+    return tuple(out) if out else None
+a, b = parse(sys.argv[1]), parse(sys.argv[2])
+if a is None or b is None:
+    print('unknown')
+else:
+    n = max(len(a), len(b))
+    a += (0,) * (n - len(a)); b += (0,) * (n - len(b))
+    print('same' if a == b else ('older' if a < b else 'newer'))
+" "$BASELINE" "$PLUGIN_VERSION" 2>/dev/null || true)"
+[ -n "$BASELINE_REL" ] || BASELINE_REL="unknown"
 
 say "1. Local edits"
-if [ -z "$BASELINE" ]; then
-  if [ -d "$CLAUDE/commands" ]; then
-    say "  No baseline recorded - this repo predates the plugin."
-    say "  Its copies cannot be meaningfully diffed against v$PLUGIN_VERSION, because"
-    say "  the plugin has been generalized since they were made. They are NOT deleted:"
-    say "  step 4 moves them to .claude/_pre-plugin/ so you can diff at your leisure."
-    say ""
-    say "  If you improved a command in place and never propagated it, that work is in"
-    say "  _pre-plugin/ and is the thing to review before you delete that folder."
+if [ "$BASELINE_REL" != "same" ]; then
+  # Not diffable. The two situations below look identical from the outside, so name
+  # the one that was picked - that line is the whole audit trail for not refusing.
+  if [ -z "$BASELINE" ]; then
+    say "  MODE: no baseline recorded - this repo predates the plugin."
+  elif [ "$BASELINE_REL" = "older" ]; then
+    say "  MODE: un-run migration - baseline v$BASELINE is older than plugin v$PLUGIN_VERSION."
+    say "  The copies here were made from v$BASELINE and the plugin has moved on since, so"
+    say "  a diff against v$PLUGIN_VERSION shows the plugin's changes, not yours. That is"
+    say "  not local drift and it is not grounds to refuse."
+  elif [ "$BASELINE_REL" = "newer" ]; then
+    say "  MODE: baseline v$BASELINE is NEWER than this plugin checkout (v$PLUGIN_VERSION)."
+    say "  This checkout is behind the plugin the repo was installed from, so applying"
+    say "  restamps the baseline DOWN to v$PLUGIN_VERSION. Pull this repo first if that"
+    say "  is not what you want."
   else
-    say "  No baseline and no local copies - clean install."
+    say "  MODE: baseline '$BASELINE' is not a version comparable to v$PLUGIN_VERSION."
+    say "  Treating it as no baseline rather than guessing."
   fi
+  if [ -d "$CLAUDE/commands" ]; then
+    say ""
+    say "  The copies are NOT deleted: step 4 moves them to .claude/_pre-plugin/ so you"
+    say "  can diff at your leisure. If you improved a command in place and never"
+    say "  propagated it, that work is in _pre-plugin/ and is the thing to review before"
+    say "  you delete that folder."
+  else
+    say "  No local copies here - nothing that could have been edited."
+  fi
+  say "  Step 6 stamps the baseline to v$PLUGIN_VERSION."
 else
+  say "  MODE: drift check - baseline v$BASELINE matches the plugin, so anything that"
+  say "  differs below is a local edit."
   LOST=0
   for f in next start mine status done groom reconcile; do
     old="$CLAUDE/commands/$f.md"
     new="$PLUGIN/skills/$f/SKILL.md"
     [ -f "$old" ] || continue
-    a="$(sed '1{/^---$/!q};1,/^---$/d' "$old" 2>/dev/null || true)"
-    b="$(sed '1{/^---$/!q};1,/^---$/d' "$new" 2>/dev/null || true)"
+    a="$(strip_frontmatter "$old")"
+    b="$(strip_frontmatter "$new")"
     if [ "$a" != "$b" ]; then
       n=$(diff <(printf '%s' "$a") <(printf '%s' "$b") | grep -c '^[<>]' || true)
       say "  DIFFERS  commands/$f.md  ($n lines) - edited since v$BASELINE"
