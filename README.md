@@ -20,6 +20,50 @@ So Launch Control tracks two kinds of work in one board:
 
 The second one is the point. Nothing else reports it.
 
+Here is what it printed for a real iOS app on 2026-09-16, with one line reworded
+so a security gap is not published:
+
+```
+As of 2026-09-16. All figures are calendar days.
+
+CLOCKS - start these, then walk away
+  CF-09    lead   14-42  earliest finish 2026-09-30 .. 2026-10-28  [Ready]
+           Submit the Spotify Extended Quota Mode application
+  CF-21    lead     1-7  earliest finish 2026-09-17 .. 2026-09-23  [Backlog, waits on CF-16, CF-19]
+           Submit for review
+  CF-08    lead     1-2  earliest finish 2026-09-17 .. 2026-09-18  [Ready]
+           Request SES production access to leave the sandbox
+  CF-14    lead       0  earliest finish 2026-09-16 .. 2026-09-16  [Ready]
+           Reissue the APNs key as Sandbox AND Production
+  CF-15    lead       0  earliest finish 2026-09-16 .. 2026-09-16  [Ready]
+           Create the App Store Connect app record
+
+  Unranked - External with no Lead days, so nothing can compute with them:
+  CF-06    [Ready] Rotate the Ticketmaster and Songkick API keys, then deploy
+           Lead time says: Songkick keys are issued by request, not self-service - lead time unknown
+
+YOUR DESK - self-serve and unblocked, smallest first
+  CF-07    XS  Back up the encryption key outside the secrets store
+  CF-04    S   Run the first terraform apply since 2026-08-26
+  CF-10    S   Do the timed restore drill and record the RTO
+
+START TODAY
+  CF-09 - Submit the Spotify Extended Quota Mode application
+  Chain:  CF-09 14-42 = 14-42 days
+  CF ends no sooner than 14-42+ days out (2026-09-30 .. 2026-10-28), so slack = 42 - 42 = 0.
+  Every day this waits moves that launch a day.
+
+  Runners-up (slack, chain on the max bound):
+    CF-14    slack   35  chain 1-7
+    CF-15    slack   35  chain 1-7
+    CF-08    slack   40  chain 1-2
+
+  ? = unknown lead counted as 0.  + = a floor, because an unknown lead sits in that chain.
+```
+
+The API-approval clock heads the list, and the release can't finish before it does.
+The two zero-lead Apple tasks look urgent, but they have five weeks of slack.
+
 ## The other half: a story is Done when it is checked
 
 Every story carries a **Done when** field that must be checkable by someone who
