@@ -46,25 +46,93 @@ sys.stdout.write('\n'.join(lines))
 " "$1" 2>/dev/null || true
 }
 
+# Report why $2 is not a usable JSON config, and return non-zero. Used only from
+# step 0, before anything has been written.
+#
+# "Usable" means a top-level OBJECT, not merely well-formed: every caller here does
+# cfg.get(...) or cfg[...] = ..., so a file holding a bare list parses fine and then
+# raises several steps later, which is the whole failure this guard exists to stop.
+# Pass the parser's own message through - "line 5 column 3" is what makes the file
+# fixable, and a generic "invalid JSON" is not.
+json_problem() {
+  local label="$1" path="$2" hint="${3:-}" err
+  if [ ! -f "$path" ]; then
+    say "  MISSING  $label"
+    say "           $path"
+    [ -n "$hint" ] && say "           $hint"
+    return 1
+  fi
+  if ! err="$(python3 -c "
+import json, sys
+cfg = json.load(open(sys.argv[1], encoding='utf-8'))
+if not isinstance(cfg, dict):
+    raise SystemExit('top-level value is %s, expected a JSON object' % type(cfg).__name__)
+" "$path" 2>&1)"; then
+    say "  INVALID  $label is not usable JSON:"
+    say "           $path"
+    printf '%s\n' "$err" | tail -n 1 | sed 's/^/           /'
+    [ -n "$hint" ] && say "           $hint"
+    return 1
+  fi
+  return 0
+}
+
 say "Launch Control -> $TARGET"
 [ "$DRY" -eq 1 ] && say "(dry run - pass --apply to make these changes)"
 say ""
 
-if [ ! -f "$CLAUDE/launch-control.json" ]; then
-  say "!! $CLAUDE/launch-control.json not found."
-  say "   Copy examples/launch-control.example.json there and fill it in first."
-  exit 1
+# ------------------------------------------ 0. can this script run here at all?
+# EVERY write happens after this block: step 4 MOVES command and hook files into
+# _pre-plugin/, step 5 appends to .gitignore, step 6 rewrites launch-control.json.
+# So everything the script depends on is validated HERE, before the first write,
+# and a failure leaves the repo untouched.
+#
+# Until 2026-09-15 this block checked only for other work in flight, and the
+# dependencies were never checked at all. An unparseable launch-control.json got
+# past step 1 (whose python ends in `|| true`) and step 2 (wrapped in
+# `if ... then :; fi`), let steps 4 and 5 move files and edit .gitignore, and only
+# then hit the unguarded json.load in step 6, which raised under `set -euo pipefail`
+# and killed the script: repo half-migrated, no baseline stamped, steps 7-8 skipped,
+# no summary, nothing undone. A missing python3 took the identical path. That is the
+# second time the installer was found able to leave a repo half-migrated (see the
+# header, and the BSD-sed note on strip_frontmatter), so new dependencies are added
+# HERE, never checked downstream.
+say "0. Can this run here?"
+BUSY=0
+STOP=0
+PLUGIN_VERSION=""
+
+if command -v python3 >/dev/null 2>&1; then
+  json_problem "launch-control.json" "$CLAUDE/launch-control.json" \
+    "Copy examples/launch-control.example.json there and fill it in first." || STOP=1
+  json_problem "the plugin manifest" "$PLUGIN/.claude-plugin/plugin.json" \
+    "This checkout looks incomplete - re-clone launch-control." || STOP=1
+  if [ "$STOP" -eq 0 ]; then
+    PLUGIN_VERSION="$(python3 -c "
+import json, sys
+print(json.load(open(sys.argv[1], encoding='utf-8')).get('version', '') or '')
+" "$PLUGIN/.claude-plugin/plugin.json")"
+    if [ -z "$PLUGIN_VERSION" ]; then
+      say "  NO VERSION  the plugin manifest has no \"version\":"
+      say "              $PLUGIN/.claude-plugin/plugin.json"
+      say "              Step 6 stamps that version into this repo as its drift"
+      say "              baseline, so an empty one makes every later drift check lie."
+      STOP=1
+    fi
+  fi
+else
+  say "  NO PYTHON  python3 is not on PATH."
+  say "             Steps 1, 2, 3, 6 and 7 are all python3. Without it this script"
+  say "             gets as far as moving your command files aside and then stops."
+  say "             Install python3 and re-run."
+  STOP=1
 fi
 
-# ------------------------------------------- 0. is something else working here?
-# Every later step writes to .claude/ or .gitignore. If a session is live in the
-# target, it may be rewriting those same files: on 2026-09-08 one did, dropped the
-# ignore lines this script had just added, and the next commit swept
-# launch-control.local.json into git. So refuse while anything looks in flight.
-# Untracked files are not counted - a freshly created launch-control.json is the
-# normal starting point for an install.
-say "0. Other work in progress"
-BUSY=0
+# If a session is live in the target it may be rewriting the same files: on
+# 2026-09-08 one did, dropped the ignore lines this script had just added, and the
+# next commit swept launch-control.local.json into git. So refuse while anything
+# looks in flight. Untracked files are not counted - a freshly created
+# launch-control.json is the normal starting point for an install.
 STORY=""
 [ -f "$CLAUDE/.current-story" ] && STORY="$(tr -d '[:space:]' < "$CLAUDE/.current-story")"
 if [ -n "$STORY" ]; then
@@ -81,6 +149,14 @@ if git -C "$TARGET" rev-parse --git-dir >/dev/null 2>&1; then
     say "           Commit or stash them (git -C $TARGET stash), then re-run."
     BUSY=1
   fi
+fi
+# A missing dependency stops BOTH modes. Unlike work in flight, it is not something
+# --apply could be forced past, and a dry run that continued would just print
+# tracebacks where its report should be.
+if [ "$STOP" -eq 1 ]; then
+  say ""
+  say "  STOPPING. Nothing has been changed."
+  exit 1
 fi
 if [ "$BUSY" -eq 1 ]; then
   if [ "$DRY" -eq 0 ]; then
@@ -105,8 +181,14 @@ say ""
 # step 6, which this check runs before, so the repo can never reach a baseline that
 # would let it pass. An older baseline is an un-run migration, not drift - treat it
 # as no baseline and fall through, exactly as the comment above says to.
-PLUGIN_VERSION="$(python3 -c "import json;print(json.load(open('$PLUGIN/.claude-plugin/plugin.json')).get('version',''))" 2>/dev/null || true)"
-BASELINE="$(python3 -c "import json;print(json.load(open('$CLAUDE/launch-control.json')).get('installedVersion','') or '')" 2>/dev/null || true)"
+# PLUGIN_VERSION came from step 0, which refused to get this far without one. An
+# absent installedVersion, by contrast, is a legitimate state - it means "never
+# installed from a plugin" - so an empty BASELINE here is data, not an error. It no
+# longer hides a parse failure: step 0 has already proved the file is a JSON object.
+BASELINE="$(python3 -c "
+import json, sys
+print(json.load(open(sys.argv[1], encoding='utf-8')).get('installedVersion', '') or '')
+" "$CLAUDE/launch-control.json")"
 # same | older | newer | unknown (unset, or not a dotted-numeric version)
 BASELINE_REL="$(python3 -c "
 import sys
