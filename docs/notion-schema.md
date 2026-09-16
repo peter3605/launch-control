@@ -60,7 +60,7 @@ Seven, each answering one question. Every one is referenced by name in
 | Key | Filter | Read by |
 |---|---|---|
 | `ready` | Status is `Ready` **and** Agent can do this is checked | `/lc:next` |
-| `yourTurn` | Agent can do this is **un**checked, Type is `Launch Blocker`, not Done | `/lc:mine` |
+| `yourTurn` | Agent can do this is **un**checked, not Done. **No Type filter, deliberately** | `/lc:mine` |
 | `inProgress` | Status is `In Progress` | `/lc:status` |
 | `inReview` | Status is `In Review` | `/lc:status` |
 | `waitingExternal` | Gating is `External`, not Done | `/lc:status` |
@@ -75,3 +75,21 @@ scoping bug reads exactly like a clean bill of health. `/lc:reconcile` therefore
 refuses to run if zero rows come back or if a returned Story ID does not match the
 repo's prefix. Keep a free-for-all browse view if you want one, but do not
 reference it from any command.
+
+### Why `yourTurn` has no Type filter
+
+It used to filter to `Type = Launch Blocker`, and that quietly broke the one thing
+`/lc:mine` exists to do. Type is assigned at groom time, by a model weighing "does
+this block shipping?" — a question with nothing to do with whether a human has to do
+the work. So anything it typed `Backlog` or `Chore` became invisible to the command
+built to surface human work, while `/lc:groom` went on telling people that unchecking
+**Agent can do this** was enough to put an item in `/lc:mine`.
+
+It cost something real before it was found: a `/lc:mine` run on 2026-09-15 had to dig
+out a leaked GitHub token by hand — the most urgent item on that board — because it
+had been typed `Backlog`.
+
+**Agent can do this** is the only question this view should ask, because it is the
+only one whose answer decides who can act. Type is in the view's columns, so
+`/lc:mine` can still rank or label by it; it just cannot hide anything. If you are
+tempted to narrow this filter again, narrow it in `/lc:mine`'s output instead.

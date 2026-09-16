@@ -25,6 +25,6 @@ File **$ARGUMENTS** into the Launch Control backlog.
 6. Set **Status** to `Ready` if nothing blocks it, `Backlog` otherwise.
 7. Report the new story ID and where it lands in the sequence.
 
-Two things to get right rather than fast. **Done when** must be checkable by someone who was not in this conversation — a command that exits 0, a file that contains a value, a screen that shows a thing. Restating the title is not acceptance criteria. And **Agent can do this** must be honest: uncheck it if the task needs a GUI, a login, a payment, a physical device, or a third party, so it lands in `/lc:mine` rather than being offered to a session that cannot do it.
+Two things to get right rather than fast. **Done when** must be checkable by someone who was not in this conversation — a command that exits 0, a file that contains a value, a screen that shows a thing. Restating the title is not acceptance criteria. And **Agent can do this** must be honest: uncheck it if the task needs a GUI, a login, a payment, a physical device, or a third party, so it lands in `/lc:mine` rather than being offered to a session that cannot do it. That checkbox alone decides it — the `yourTurn` view `/lc:mine` reads filters on nothing else, so a Chore or a Backlog item shows up there exactly like a Launch Blocker. Type answers a different question ("does this block shipping?"); never bend it to make something visible.
 
 Estimates: XS under an hour, S 1-3 hours, M half a day, L 1-2 days, XL 3+ days.
