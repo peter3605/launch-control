@@ -40,7 +40,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.dont_write_bytecode = True  # importing doctor must not litter the installed plugin
 sys.path.insert(0, os.path.join(HERE, "..", "doctor"))
-from doctor import load_json, git  # noqa: E402
+from doctor import load_json, unwrap_saved, git  # noqa: E402
 
 SHARED_VIEWS = ("ready", "inProgress", "inReview", "waitingExternal", "yourTurn", "board")
 DDL_TYPES = {"title": "TITLE", "text": "RICH_TEXT", "number": "NUMBER", "checkbox": "CHECKBOX"}
@@ -272,8 +272,8 @@ def fetch_text(path):
         data = json.loads(raw)
     except ValueError:
         return raw
-    if isinstance(data, list):  # a saved MCP result: content blocks whose text is the payload
-        data = "".join(b.get("text", "") for b in data if isinstance(b, dict))
+    if isinstance(data, list):
+        data = unwrap_saved(data)
         try:
             data = json.loads(data)
         except ValueError:
