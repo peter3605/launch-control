@@ -82,13 +82,142 @@ of them back to check it. Filing an actual backlog with `/lc:plan` is a separate
 session again, and a longer one — it reads your design doc or repo before it proposes
 anything.
 
-**What the Notion dependency costs you.** Say this out loud before you commit to it:
-your story titles, acceptance criteria, trap notes and per-session records all live in
-a third-party SaaS, on their servers, under their terms. For an unreleased product
-that is a real disclosure decision, and this repo would rather you made it now than
-discover it later. There is no self-hosted backend and no export command yet. The
-board is a plain Notion database, so Notion's own export gets your data out, but
-nothing here re-imports it.
+## Before you install
+
+Four questions worth answering before you run anything. The answers are all in the
+source, but you should not have to read it to decide.
+
+### What leaves your machine
+
+**Everything Launch Control stores goes to your own Notion workspace**, and it gets
+there through *your* Notion MCP connector under your own OAuth grant. The plugin ships
+no credentials and contains no network code of its own — no HTTP client, no endpoint, no
+telemetry, no analytics, no version ping. It cannot reach Notion by itself; the session
+does the writing.
+
+What lands on the board:
+
+- **Story text** — the title, the **Done when** criteria, the **Notes and traps**,
+  estimate, epic, status, sequence, story ID, lead times, and the blocker links between
+  stories. `Done when` and `Notes and traps` are *meant* to name real commands and real
+  file paths — that is what makes a criterion checkable — so **file names, paths and
+  commands from your repo are on the board by design.**
+- **Your repo's absolute path.** The Projects row stores it verbatim, so on a typical
+  macOS or Linux machine your OS username is in Notion — `/Users/<you>/Repos/<project>`.
+- **Per-session records.** `/lc:done` writes into **Last session**: the date, one or two
+  sentences on what the session did, the commit SHA and the PR number or URL. When a
+  criterion fails it writes what went wrong, which in practice can be an error message
+  or a test failure.
+- **Command output, in one place by instruction.** `/lc:reconcile` requires evidence to
+  close a story and is explicit that this means the command you ran *and its output*, or
+  the file and line. A bare "already done" is rejected. Short excerpts of real tool
+  output therefore reach Notion.
+- **Whatever `/lc:plan` turns into a backlog.** It reads your design doc or repo to
+  propose stories, so prose derived from that document ends up in story fields. It files
+  nothing until you confirm, and the evidence it gathers while checking claims stays in
+  a local file rather than on the board.
+
+**What does not go to Notion:** source code, diffs and patches. Nothing writes file
+contents to the board, and every row is properties-only — no page bodies, no comments,
+no attachments. Be aware of the honest limit on that promise: these fields are free text
+written by an agent, not a constrained payload, so nothing *mechanically* stops a snippet
+or a log excerpt landing in one. No instruction asks for it; no check forbids it.
+
+**Other things that touch the network**, all ordinary developer tooling under your own
+credentials: `/lc:done` runs `git push` and uses `gh` to open the PR, read the check
+rollup and merge — and the PR body it writes carries the story ID and the **Done when**
+verbatim, so that much story text also lands on your git host. `/lc:doctor`, `/lc:plan`
+and `/lc:init` run `git ls-remote` to confirm your base branch, which contacts the remote
+for a ref listing and nothing more. The two hooks are local shell and make no network
+calls at all.
+
+One thing this does *not* claim: Launch Control is a layer over Claude Code, so your code
+is already being read by an agent and sent to its model provider. That is true before you
+install this and has nothing to do with the board.
+
+**Say the rest out loud before you commit to it:** your story titles, acceptance
+criteria, trap notes and per-session records live in a third-party SaaS, on their
+servers, under their terms. For an unreleased product that is a real disclosure
+decision, and this repo would rather you made it now than discover it later. There is
+no self-hosted backend and no export command yet.
+
+### What it can do to your repo
+
+| It can | When | Governed by |
+|---|---|---|
+| Create a branch, write `.claude/.current-story` | `/lc:start` | — |
+| Commit and push a branch | `/lc:done` | — |
+| **Open a pull request against your base branch** | `/lc:done` | `git.baseBranch` picks the target |
+| **Merge that pull request and delete the branch** | `/lc:done` | `git.autoMerge` — **`false` unless you change it** |
+| Block a session from exiting silently | `Stop` hook, once per story | fires once per story, then never again |
+
+**Merging is off by default.** Both `/lc:init` and `/lc:plan` write `autoMerge: false`
+into a new repo's config, so out of the box `/lc:done` stops at a green PR, sets the
+story `In Review`, and leaves the merge to you. Setting `mergeIsDeploy: true` makes it
+stop that way permanently, green or not. It stages deliberately and never runs
+`git add -A`, and it never merges with `--admin` or past a failing check.
+
+These live in the `git` block of `.claude/launch-control.json`; the full set, including
+`enabled`, is in [`docs/config-reference.md`](docs/config-reference.md).
+
+Outside `.claude/`, the only file any of this touches is `.gitignore`, to which
+`/lc:init` and `/lc:plan` append the four lines listed below. The one exception is
+`install.sh --apply`, used only for the copied-files migration: on top of its own
+`.gitignore` lines it rewrites bare `/next`-style command references in `CLAUDE.md` to
+the `/lc:` namespace, and moves the old copied commands and hooks into
+`.claude/_pre-plugin/` rather than deleting them. Its dry run is the default and prints
+all of it first.
+
+### How to remove it
+
+```
+/plugin uninstall lc@launch-control
+/plugin marketplace remove launch-control
+```
+
+Then delete these, none of which anything else reads. Apart from the `.gitignore` lines
+below, every file Launch Control creates in a repo is under `.claude/`:
+
+```
+.claude/launch-control.json           # the per-repo config
+.claude/launch-control.local.json     # private notice, if you made one
+.claude/.current-story                # the bound-story marker
+.claude/.nudged                       # the Stop hook's once-per-story guard
+.claude/lc-plan/                      # /lc:plan's proposal and resume state
+.claude/lc-init/                      # /lc:init's ledger; ignores itself, so gitignore has no line for it
+.claude/_pre-plugin/                  # only if you migrated with install.sh
+```
+
+And remove the four lines appended to `.gitignore`. `/lc:init` and `/lc:plan` add:
+
+```
+.claude/launch-control.local.json
+.claude/.current-story
+.claude/.nudged
+.claude/lc-plan/
+```
+
+`install.sh` adds the same first three plus `.claude/_pre-plugin/`, so a repo that was
+migrated may have five lines rather than four.
+
+Two leftovers to know about. `install.sh` rewrote `CLAUDE.md` command references to
+`/lc:next` and friends; that is not reverted for you, so fix them by hand if you care.
+And removing `.claude/launch-control.json` alone is enough to silence Launch Control
+even with the plugin still installed — both hooks open with
+`[ -f launch-control.json ] || exit 0` and exit quietly without it.
+
+### What happens to the board
+
+**Nothing, unless you delete it.** The board is two ordinary Notion databases in your
+own workspace, made of ordinary Notion properties and views. Nothing is encoded,
+nothing is proprietary, and this project holds no copy of it. Uninstalling the plugin
+does not touch it — it just stops anything reading or writing it.
+
+To end it, delete the Launch Control page in Notion; everything inside goes with it.
+To keep the data, Notion's own export gets it out as CSV or Markdown, though nothing
+here re-imports it. Revoking the connector's access to that page (the same `···` →
+**Add connections** menu that granted it) cuts the plugin off while leaving the board
+intact.
 
 ## Install
 

@@ -300,8 +300,8 @@ say ""
 # ------------------------------------------------ 3. unwire the old local hooks
 say "3. Old per-repo hook wiring in settings.json"
 # Remove only the handlers the copied layout installed, and leave every other
-# SessionStart or Stop hook alone. Every pre-plugin repo checked on 2026-09-14
-# (four product repos) wired exactly
+# SessionStart or Stop hook alone. All four pre-plugin repos checked on 2026-09-14
+# wired exactly
 #   "$CLAUDE_PROJECT_DIR"/.claude/hooks/session-start.sh   under SessionStart
 #   "$CLAUDE_PROJECT_DIR"/.claude/hooks/stop.sh            under Stop
 # and step 4 moves those two scripts away, so a handler running either is ours by
@@ -368,8 +368,8 @@ say ""
 # ------------------------------------------------------- 4. retire the copies
 say "4. Retire the copied command and hook files"
 # Move ONLY the seven files this plugin owns. The commands directory can hold
-# other tools' commands - one repo keeps another tool's commands in there - and moving
-# the whole directory would silently break them.
+# other tools' commands - one repo checked kept another tool's command namespace
+# in there - and moving the whole directory would silently break them.
 FOUND=0
 for f in next start mine status done groom reconcile; do
   [ -f "$CLAUDE/commands/$f.md" ] && FOUND=$((FOUND+1))
