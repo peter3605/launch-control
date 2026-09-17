@@ -22,12 +22,22 @@ import collections
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 
 VIEW_KEYS = ("ready", "inProgress", "inReview", "waitingExternal", "yourTurn", "board", "road")
 
 failures = []
+
+
+class CheckError(Exception):
+    """A failure this script anticipated, phrased for the person reading the output.
+
+    These scripts set the exit code, so the verdict is theirs and not the session's.
+    A traceback satisfies "exits non-zero" while telling the reader nothing about
+    what to fix, so every expected failure is raised as this and printed as a FAIL.
+    """
 
 
 def ok(msg):
@@ -48,6 +58,27 @@ def load_json(path):
         return json.load(f)
 
 
+def read_json(path, what):
+    """load_json, but every way it can fail comes back as a sentence naming `what`.
+
+    The saved view files are written by the session from an MCP result, so missing
+    and half-written are both routine - a truncated file is the one that used to
+    surface as a bare JSONDecodeError twenty frames down."""
+    try:
+        return load_json(path)
+    except FileNotFoundError:
+        raise CheckError(f"{what} not found: {path}") from None
+    except IsADirectoryError:
+        raise CheckError(f"{what} is a directory, not a file: {path}") from None
+    except UnicodeDecodeError as e:
+        raise CheckError(f"{what} is not text: {path} ({e})") from None
+    except json.JSONDecodeError as e:
+        raise CheckError(f"{what} is not valid JSON - truncated or half-written? "
+                         f"{path} (line {e.lineno} column {e.colno}: {e.msg})") from None
+    except OSError as e:
+        raise CheckError(f"{what} could not be read: {path} ({e.strerror or e})") from None
+
+
 def unwrap_saved(data):
     """A large MCP tool result is saved to disk as a list of content blocks whose
     text is the payload. Return that text; return anything else unchanged."""
@@ -56,10 +87,20 @@ def unwrap_saved(data):
     return data
 
 
-def load_result(path):
+def load_result(path, what="saved view result"):
     """A saved query result as a JSON object, from either form the tool writes."""
-    data = unwrap_saved(load_json(path))
-    return json.loads(data) if isinstance(data, str) else data
+    data = unwrap_saved(read_json(path, what))
+    if isinstance(data, str):
+        try:
+            data = json.loads(data)
+        except json.JSONDecodeError as e:
+            # The outer file parsed, so the payload string inside it is the truncated
+            # half. Say which layer failed - they look identical from the error alone.
+            raise CheckError(f"{what} holds a content block whose text is not valid JSON - "
+                             f"truncated? {path} (line {e.lineno} column {e.colno}: {e.msg})") from None
+    if not isinstance(data, dict):
+        raise CheckError(f"{what} is {type(data).__name__}, not a query result object: {path}")
+    return data
 
 
 def notion_id(url):
@@ -69,8 +110,33 @@ def notion_id(url):
     return m[-1] if m else ""
 
 
+def git_env():
+    """An environment where git cannot stop and ask a human anything.
+
+    doctor runs unattended inside a session. GIT_TERMINAL_PROMPT=0 makes git fail
+    instead of prompting for HTTPS credentials; ssh does its own prompting for a
+    passphrase-locked key and ignores that, so BatchMode covers the SSH remotes.
+    An already-set GIT_SSH_COMMAND is the user's, so it is left alone."""
+    env = dict(os.environ, GIT_TERMINAL_PROMPT="0")
+    env.setdefault("GIT_SSH_COMMAND", "ssh -o BatchMode=yes")
+    return env
+
+
 def git(repo, *args):
-    r = subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True, timeout=30)
+    """git's stdout, or "" if the command failed for any reason.
+
+    Callers treat "" as "could not determine", which is the honest answer whether
+    git is missing, the remote hung, or the command simply returned non-zero. Every
+    one of these used to leave the script as a stack trace."""
+    try:
+        r = subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True,
+                           timeout=30, stdin=subprocess.DEVNULL, env=git_env())
+    except subprocess.TimeoutExpired:
+        return ""          # a network call to an unreachable remote
+    except (FileNotFoundError, NotADirectoryError):
+        return ""          # git is not installed, or --repo is not a directory
+    except OSError:
+        return ""          # no permission to exec, fork failed, ...
     return r.stdout.strip() if r.returncode == 0 else ""
 
 
@@ -88,17 +154,34 @@ def remote_default_branch(repo):
 
 
 def read_page(page, base):
-    """Return ([(story_id, status)], has_more, error) for one page of a view result."""
+    """Return ([(story_id, status)], has_more, error) for one page of a view result.
+
+    Never raises: the caller turns `error` into a FAIL naming the view, which is more
+    use than a traceback from inside a JSON parse two files away."""
+    if not isinstance(page, dict):
+        return None, False, f"page entry is {type(page).__name__}, not an object"
     if "error" in page:
         return None, False, str(page["error"])
     if "file" in page:
-        path = os.path.join(base, page["file"])
-        raw = load_result(path)
-        rows = raw.get("results", [])
+        path = os.path.join(base, str(page["file"]))
+        try:
+            raw = load_result(path)
+        except CheckError as e:
+            return None, False, str(e)
+        rows = raw.get("results")
+        if not isinstance(rows, list):
+            return None, False, (f"saved view result has no `results` list "
+                                 f"({'missing' if rows is None else type(rows).__name__}): {path}")
+        if not all(isinstance(r, dict) for r in rows):
+            return None, False, f"saved view result has a row that is not an object: {path}"
         rows = [(str(r.get("Story ID") or ""), str(r.get("Status") or "")) for r in rows]
         return rows, bool(raw.get("has_more")), None
     if "rows" in page:
-        return [(str(i or ""), str(s or "")) for i, s in page["rows"]], bool(page.get("hasMore")), None
+        pairs = page["rows"]
+        if not isinstance(pairs, list) or not all(
+                isinstance(p, (list, tuple)) and len(p) == 2 for p in pairs):
+            return None, False, "`rows` must be a list of [story id, status] pairs"
+        return [(str(i or ""), str(s or "")) for i, s in pairs], bool(page.get("hasMore")), None
     return None, False, f"unrecognised page entry {sorted(page)}"
 
 
@@ -115,20 +198,23 @@ def main():
     print(f"Launch Control doctor -> {repo}")
 
     try:
-        cfg = load_json(os.path.join(claude, "launch-control.json"))
-    except FileNotFoundError:
-        print("  FAIL  .claude/launch-control.json not found")
+        cfg = read_json(os.path.join(claude, "launch-control.json"), ".claude/launch-control.json")
+    except CheckError as e:
+        print(f"  FAIL  {e}")
         return 1
-    except ValueError as e:
-        print(f"  FAIL  .claude/launch-control.json is not valid JSON: {e}")
+    if not isinstance(cfg, dict):
+        print(f"  FAIL  .claude/launch-control.json must be an object, not {type(cfg).__name__}")
         return 1
     local = {}
     local_path = os.path.join(claude, "launch-control.local.json")
     if os.path.exists(local_path):
         try:
-            local = load_json(local_path)
-        except ValueError as e:
-            fail(f"launch-control.local.json is not valid JSON: {e}")
+            local = read_json(local_path, "launch-control.local.json")
+        except CheckError as e:
+            fail(str(e))
+        if not isinstance(local, dict):
+            fail(f"launch-control.local.json must be an object, not {type(local).__name__}")
+            local = {}
 
     prefix = cfg.get("prefix") or ""
     if not prefix:
@@ -155,6 +241,10 @@ def main():
     g = cfg.get("git") or {}
     if g.get("enabled") is False:
         skip("git.enabled is false - base branch not used")
+    elif shutil.which("git") is None:
+        # Distinguished from the next branch on purpose: both used to arrive as the
+        # same "not a git repository", which sends the reader to fix the wrong thing.
+        fail("git is not on PATH, but git.enabled is not false - install git, or set git.enabled false")
     elif not git(repo, "rev-parse", "--git-dir"):
         fail("not a git repository, but git.enabled is not false")
     else:
@@ -174,7 +264,10 @@ def main():
         skip("view resolution, road scoping and duplicate IDs - run with --views for a full check")
     else:
         base_dir = os.path.dirname(os.path.abspath(args.views))
-        results = load_json(args.views)
+        results = read_json(args.views, "the --views file")
+        if not isinstance(results, dict):
+            raise CheckError(f"the --views file must be an object keyed by view name, "
+                             f"not {type(results).__name__}: {args.views}")
         for k in VIEW_KEYS:
             if not views.get(k):
                 continue
@@ -257,5 +350,20 @@ def main():
     return 0
 
 
+def cli():
+    """Backstop: an anticipated failure raised anywhere below is still a FAIL line.
+
+    The specific call sites phrase their own errors; this only guarantees that none
+    of them can reach the user as a traceback if a new one is added without one."""
+    try:
+        return main()
+    except CheckError as e:
+        print(f"\n  FAIL  {e}")
+        return 1
+    except KeyboardInterrupt:
+        print("\n  FAIL  interrupted")
+        return 130
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(cli())
