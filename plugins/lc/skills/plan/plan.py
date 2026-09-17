@@ -27,7 +27,11 @@ PROPOSAL is the backlog the session drafted and the user reviewed:
                   "agent": true|false, "leadTime", "leadDays": [min, max],
                   "doneWhen", "notes",
                   "blockedBy": ["D0"], "clock": "<clock key, if it is one>",
+                  "leadDaysReason": "<why this clock's leadDays differ from clocks.json>",
                   "agentOverride": "<why an agent can do it despite the wording>"}]}
+
+A story with `clock` set is held to that entry in clocks.json: its leadDays must
+match unless leadDaysReason says why, and an omitted epic or estimate is the clock's.
 
 STATE is this run's ledger of what has been filed ({draft: {"id", "url"}}). It is
 what makes a run resumable after a failure, and it is counted when allocating
@@ -160,6 +164,21 @@ def load_clocks():
     return load_json(os.path.join(HERE, "clocks.json"))["clocks"]
 
 
+def with_clock(story, by_key):
+    """The story with its clock's epic and estimate filled in where the draft left them out."""
+    clock = by_key.get(story.get("clock"))
+    if not clock:
+        return story
+    return {**{k: clock[k] for k in ("epic", "estimate") if clock.get(k)},
+            **{k: v for k, v in story.items() if v not in (None, "")}}
+
+
+def diverges(story, clock):
+    """The clock's (min, max) if the story's leadDays differ from it, else None."""
+    theirs = tuple(clock["leadDays"])
+    return theirs if lead_days(story) is not None and lead_days(story) != theirs else None
+
+
 def repo_files(repo, limit=20000):
     out = []
     for root, dirs, files in os.walk(repo):
@@ -289,7 +308,9 @@ def cmd_lint(args):
     p = load_json(args.proposal)
     print(f"Launch Control plan lint -> {args.proposal}")
     proj = p.get("project") or {}
-    stories = p.get("stories") or []
+    by_key = {c["key"]: c for c in load_clocks()}
+    drafted = p.get("stories") or []
+    stories = [with_clock(s, by_key) for s in drafted]
     epics = [e.strip() for e in args.epics.split(",")] if args.epics else None
 
     print("\nProject")
@@ -404,6 +425,30 @@ def cmd_lint(args):
         warn("every story is agent-doable - that is rare for a launch and empties /lc:mine; re-read each one")
 
     print("\nExternal clocks")
+    # A filed clock is only as good as the numbers it carries: /lc:mine ranks by leadDays
+    # and a wrong figure produces a confident wrong pick, not an error. So the story must
+    # say what clocks.json says, or say why this launch differs.
+    for raw, s in zip(drafted, stories):
+        k = s.get("clock")
+        if not k:
+            continue
+        tag = f"{s.get('draft')} clock {k!r}"
+        clock = by_key.get(k)
+        if not clock:
+            fail(f"{tag} is not in clocks.json - leave `clock` off a clock the dataset does not know")
+            continue
+        theirs = diverges(s, clock)
+        reason = (s.get("leadDaysReason") or "").strip()
+        if theirs and len(reason.split()) < 3:
+            fail(f"{tag}: leadDays {list(lead_days(s))} but clocks.json says {list(theirs)} - "
+                 "match it, or give leadDaysReason saying why this launch differs")
+        elif theirs:
+            ok(f"{tag}: leadDays {list(lead_days(s))} differ from clocks.json {list(theirs)}: {reason}")
+        elif reason:
+            warn(f"{tag}: leadDaysReason given but leadDays match clocks.json - drop it")
+        for field in ("epic", "estimate"):
+            if raw.get(field) and clock.get(field) and raw[field] != clock[field]:
+                warn(f"{tag}: {field} {raw[field]!r} overrides the clock's {clock[field]!r}")
     if args.repo or args.source:
         declined = p.get("clocksDeclined") or {}
         filed = {s.get("clock") for s in stories if s.get("clock")}
@@ -478,10 +523,18 @@ def cmd_payload(args):
     p = load_json(args.proposal)
     state = filed(load_state(args.state))
     stories = p["stories"]
-    story = next((s for s in stories if s["draft"] == args.draft), None)
+    by_key = {c["key"]: c for c in load_clocks()}
+    story = next((with_clock(s, by_key) for s in stories if s["draft"] == args.draft), None)
     if not story:
         print(f"no draft {args.draft!r} in the proposal", file=sys.stderr)
         return 1
+    notes = story.get("notes") or ""
+    theirs = diverges(story, by_key[story["clock"]]) if story.get("clock") in by_key else None
+    if theirs:
+        # On the board, so a reader can tell a researched departure from an invented number.
+        lo, hi = lead_days(story)
+        notes = (f"Lead days {lo}-{hi} differ from the `clocks.json` figure {theirs[0]}-{theirs[1]}: "
+                 f"{story.get('leadDaysReason', '').strip()}" + (f"\n\n{notes}" if notes else ""))
     blockers = []
     for b in story.get("blockedBy") or []:
         if b not in state:
@@ -503,7 +556,7 @@ def cmd_payload(args):
         "Lead days min": (lead_days(story) or (None, None))[0],
         "Lead days max": (lead_days(story) or (None, None))[1],
         "Done when": story["doneWhen"],
-        "Notes and traps": story.get("notes") or "",
+        "Notes and traps": notes,
         "Seq": seq,
         "Blocked by": blockers,
         # Every blocker in a fresh plan is a story this run just filed, so none is Done.
