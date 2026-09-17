@@ -11,7 +11,7 @@ Bind this session to story **$ARGUMENTS**.
 3. Check its **Blocked by** relation. If any blocker is not Done, warn clearly and ask whether to proceed anyway before doing anything else.
 4. Set the story's **Status** to `In Progress`.
 5. Write the story ID to `.claude/.current-story` (one line, just the ID) and empty `.claude/.nudged` if present.
-6. Create a working branch named with the story ID, per `git.branchPattern` in the config — by default `<lowercase story id>-<short kebab slug>`.
+6. Create a working branch named `<lowercase story id>-<short kebab slug>` — the same pattern `/lc:done` expects. Never branch off anything but `git.baseBranch`.
 7. Read out the story's **Done when** and **Notes and traps** verbatim, then state your plan for satisfying the Done-when criteria.
 
 Every commit in this session should carry the story ID in its subject line.
