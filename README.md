@@ -200,12 +200,19 @@ opening a PR. See [`docs/config-reference.md`](docs/config-reference.md).
 v0.1.0, and honest about it: this was extracted from a working setup managing five
 projects, and has one real user. The board is provisioned by `/lc:init`; projects on it are provisioned by `/lc:plan`.
 
-What this is *not* is a task engine. Claude Code's native Tasks already persist
-work, track which task blocks which, and surface what just became unblocked — use
-them for the steps inside a story. Launch Control keeps a thin version of each only
-because the board has a reader native Tasks do not: a human looking across every
-project, at work that is not an agent's to do. The one thing it offers that nothing
-else does is the human-work critical path in `/lc:mine`. See
+What this is *not* is a tracker for the steps inside a story. Keep those wherever
+your agent already keeps them. Launch Control tracks **stories**, and the one thing
+it offers that nothing else does is the human-work critical path in `/lc:mine`: the
+launch blockers no agent can do, ordered by how long the outside world takes to
+answer. Persistence, a dependency graph and auto-promotion are plumbing in service
+of that, not the reason to use it.
+
+If you are wondering why this doesn't just defer to Claude Code's native Tasks: as
+of **2026-09-17** those tools are not available by default on current models.
+`TaskCreate`, `TaskList`, `TodoWrite` and the rest ship only on Claude 3.x, Opus
+4.0–4.7, Sonnet 4.0–4.6 and Haiku 4.5, and need `CLAUDE_CODE_ENABLE_TODO_TOOLS=1`
+anywhere else. Don't plan around their being there. Sources, and the date that was
+last checked, are in
 [`docs/decisions/0001-native-tasks.md`](docs/decisions/0001-native-tasks.md).
 
 MIT.
