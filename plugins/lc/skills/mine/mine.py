@@ -168,9 +168,10 @@ def main():
 
     today = datetime.date.fromisoformat(args.today) if args.today else datetime.date.today()
     rows = load(args.view)
-    if args.prefix:
-        # Narrow after loading so a blocker in the view still counts, whoever owns it.
-        keep = args.prefix.rstrip("-").upper()
+    # Narrow after loading so a blocker in the view still counts, whoever owns it.
+    # Bound unconditionally: shown() below used to dodge a NameError only because
+    # `not args.prefix or ...` short-circuits first, which is one edit from a crash.
+    keep = args.prefix.rstrip("-").upper() if args.prefix else ""
     board = Board(rows)
     if not board.items:
         print("No rows. Either nothing is waiting on a human, or the query returned nothing - check the view.")
