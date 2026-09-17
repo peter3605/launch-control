@@ -27,7 +27,7 @@
     "enabled": true,
     "baseBranch": "main",
     "mergeMethod": "squash",
-    "autoMerge": true,
+    "autoMerge": false,
     "mergeIsDeploy": false,
     "ciTimeoutMinutes": 20,
     "extraChecks": [],

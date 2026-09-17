@@ -197,8 +197,8 @@ opening a PR. See [`docs/config-reference.md`](docs/config-reference.md).
 
 ## Status
 
-v0.1.0, and honest about it: this was extracted from a working setup managing five
-projects, and has one real user. The board is provisioned by `/lc:init`; projects on it are provisioned by `/lc:plan`.
+v0.5.6, and honest about it: still pre-1.0, extracted from a working setup managing
+five projects, and has one real user. The board is provisioned by `/lc:init`; projects on it are provisioned by `/lc:plan`.
 
 What this is *not* is a tracker for the steps inside a story. Keep those wherever
 your agent already keeps them. Launch Control tracks **stories**, and the one thing
