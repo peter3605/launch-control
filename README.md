@@ -379,6 +379,15 @@ opening a PR. See [`docs/config-reference.md`](docs/config-reference.md).
 v0.5.9, and honest about it: still pre-1.0, extracted from a working setup managing
 five projects, and has one real user. The board is provisioned by `/lc:init`; projects on it are provisioned by `/lc:plan`.
 
+That version is carried in three places - `plugins/lc/.claude-plugin/plugin.json`,
+`.claude-plugin/marketplace.json`, and the line just above - and it has drifted
+apart twice. `python3 tests/check_version_sync.py` is the check that says so: it
+exits non-zero while the three disagree, naming each value and the file it came
+from, and 0 once they agree. CI runs it on every pull request. The rule it
+enforces is blanket equality, argued in the script's own docstring: bump
+plugin.json first, because `install.sh` stamps it into each installed repo as
+that repo's drift baseline, and bring the other two along in the same commit.
+
 What this is *not* is a tracker for the steps inside a story. Keep those wherever
 your agent already keeps them. Launch Control tracks **stories**, and the one thing
 it offers that nothing else does is the human-work critical path in `/lc:mine`: the

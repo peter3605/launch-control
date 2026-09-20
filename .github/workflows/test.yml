@@ -29,5 +29,12 @@ jobs:
       - name: Show interpreter
         run: python3 -VV
 
+      # The literal command the README names, run against a clean checkout so
+      # the documented path is the tested one. The suite covers this check too;
+      # a step of its own makes drift read as a failed check named for what it
+      # is, rather than as an assertion buried in 56 lines of unittest output.
+      - name: Version records agree
+        run: python3 -B tests/check_version_sync.py
+
       - name: Run the suite
         run: python3 -B -m unittest discover -s tests -t . -v
