@@ -16,7 +16,15 @@ Close out the story bound to this session.
 
 Read the `git` block in `.claude/launch-control.json` and follow it — the policy differs per repo and the differences are not cosmetic. `git.notes` carries this repo's standing warnings; read them before staging anything.
 
-**Does this story involve a repo change?** Run `git status --porcelain`. If the tree is clean, there is nothing to ship — skip to step 3. (Plenty of stories are like this: a GUI build, a dashboard setting, a filing.) Do not invent a commit to have something to push.
+**If `git.enabled` is false, ship nothing.** Make no commit, no push and no PR, and skip
+to step 14 — the story still gets verified and recorded exactly as it would otherwise.
+This is the key that means *never touch my remote*, so honour it even when the tree is
+dirty and the change is obviously good: leave the work in the working tree, say that
+shipping was skipped because `git.enabled` is false, and let the owner take it from
+there. Do not offer to ship it just this once, and do not read a clean tree or a green
+suite as permission.
+
+**Does this story involve a repo change?** Run `git status --porcelain`. If the tree is clean, there is nothing to ship — skip to step 14. (Plenty of stories are like this: a GUI build, a dashboard setting, a filing.) Do not invent a commit to have something to push.
 
 Otherwise:
 
@@ -46,6 +54,7 @@ Otherwise:
 ## 4. Record
 
 14. Set **Status** to `Done` — or leave it `In Review` if the PR is open per step 11 or 13. A story is not Done while its code is unmerged.
+    - **Where `git.enabled` is false**, merging was never this session's job, so an unmerged tree is not a reason to withhold `Done`: if the criteria hold, it is `Done`. Say in **Last session** that the change is sitting in the working tree unshipped, so whoever picks it up knows it is there.
 15. Write into **Last session**: today's date, one or two sentences on what was actually done, and the commit SHA and PR number.
 16. If the work made a *different* story wrong — a trap discovered, a dependency that was mistaken, a step no longer needed — update that story too. A stale tracker is the problem this replaced.
 17. Empty `.claude/.current-story` and `.claude/.nudged` (some filesystems forbid deleting them; an empty file reads as unbound).
