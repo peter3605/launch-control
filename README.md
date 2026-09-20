@@ -21,6 +21,50 @@ So Launch Control tracks two kinds of work in one board:
 
 The second one is the point. Nothing else reports it.
 
+Here is what it printed for a real iOS app on 2026-09-16, with its names changed
+so the project is not identifiable:
+
+```
+As of 2026-09-16. All figures are calendar days.
+
+CLOCKS - start these, then walk away
+  HX-09    lead   14-42  earliest finish 2026-09-30 .. 2026-10-28  [Ready]
+           Submit the partner API production-access application
+  HX-21    lead     1-7  earliest finish 2026-09-17 .. 2026-09-23  [Backlog, waits on HX-16, HX-19]
+           Submit for review
+  HX-08    lead     1-2  earliest finish 2026-09-17 .. 2026-09-18  [Ready]
+           Request SES production access to leave the sandbox
+  HX-14    lead       0  earliest finish 2026-09-16 .. 2026-09-16  [Ready]
+           Reissue the APNs key as Sandbox AND Production
+  HX-15    lead       0  earliest finish 2026-09-16 .. 2026-09-16  [Ready]
+           Create the App Store Connect app record
+
+  Unranked - External with no Lead days, so nothing can compute with them:
+  HX-06    [Ready] Rotate both partner API keys, then deploy
+           Lead time says: one partner issues keys by request, not self-service - lead time unknown
+
+YOUR DESK - self-serve and unblocked, smallest first
+  HX-07    XS  Back up the encryption key outside the secrets store
+  HX-04    S   Run the first terraform apply since 2026-08-26
+  HX-10    S   Do the timed restore drill and record the RTO
+
+START TODAY
+  HX-09 - Submit the partner API production-access application
+  Chain:  HX-09 14-42 = 14-42 days
+  HX ends no sooner than 14-42+ days out (2026-09-30 .. 2026-10-28), so slack = 42 - 42 = 0.
+  Every day this waits moves that launch a day.
+
+  Runners-up (slack, chain on the max bound):
+    HX-14    slack   35  chain 1-7
+    HX-15    slack   35  chain 1-7
+    HX-08    slack   40  chain 1-2
+
+  ? = unknown lead counted as 0.  + = a floor, because an unknown lead sits in that chain.
+```
+
+The API-approval clock heads the list, and the release can't finish before it does.
+The two zero-lead Apple tasks look urgent, but they have five weeks of slack.
+
 ## The other half: a story is Done when it is checked
 
 Every story carries a **Done when** field that must be checkable by someone who
