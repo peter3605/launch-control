@@ -14,13 +14,19 @@ The ranking lives in `mine.py`, in this skill's base directory. It does the cale
 2. Query the **Your turn** view (`views.yourTurn`) in **view mode**, never SQL mode (SQL is billed). Page to the end with `start_cursor` until `has_more` is false — a dropped page drops the blocker edges that make the chains.
 3. Each page must reach the script as the tool returned it. A large result is already saved to disk; use that path as it is, whether the file holds the JSON object or a list of content blocks wrapping it. A small one came back inline; write it verbatim to a file in your scratchpad. Do not transcribe rows by hand.
 4. Run `python3 <base directory>/mine.py --view <page 1> [--view <page 2> ...]`. If the user passed a project prefix, add `--prefix <PREFIX>` — the script still reads every row, because a clock in one project can block another. Without one, report across all projects, because the long-lead items rarely live in the repo you happen to be sitting in.
-5. Show the output as it printed. It has four parts:
+5. **Paste the script's stdout verbatim, in a fenced code block, before you write anything of your own.** Every line it printed, in the order it printed them, character for character — the `earliest finish` dates, the `Chain:` line, the `slack = ... = ...` line and the legend at the end all included. Do not reformat it into a table, do not re-order it, do not reword a line, do not drop the parts that look redundant. The dates and the arithmetic *are* the product; a reply that summarises them has thrown away the only thing this command does that judging by eye does not.
+
+   The known way this fails: the session replaces the block with a prose table — Story / What / Lead time / Blocked? — with the earliest-finish dates, the chain sum and the slack line gone, and the pick reduced to "it has the longest lead time". That reply is a failure of this command even when every sentence in it is true. If you are drawing a table, you have already lost the arithmetic.
+
+6. What the four parts mean. This is background so you can answer a follow-up question — it is **not** a template to rewrite the output into:
    - **Clocks** — `Gating = External`, longest lead first, with the earliest-finish window from today through the blocker chain. These have a lead time you cannot compress, and every day one sits unstarted is a day added to the end of the project.
-   - **Unranked** — External items with no **Lead days**. Name each one and say that it is invisible to the ranking until someone fills in Lead days min and max. Do not estimate them yourself in the report.
+   - **Unranked** — External items with no **Lead days**. Each is invisible to the ranking until someone fills in Lead days min and max. Do not estimate them yourself.
    - **Your desk** — self-serve and unblocked, smallest estimate first, so the quick ones are visible.
    - **Start today** — one item, with the chain it heads and the slack arithmetic.
-6. Before you repeat the pick, verify it: fetch each page in its **Blocked by** relation that is not in the view's rows and confirm it is Done. The script trusts `Status = Ready` for those, as `/lc:next` does. If one is not Done, the board is wrong — say so, and give the runner-up instead.
-7. Then say plainly which single item to start today and why, in one or two sentences drawn from the arithmetic. Do not hedge across five things — name one.
+7. Before you repeat the pick, verify it: fetch each page in its **Blocked by** relation that is not in the view's rows and confirm it is Done. The script trusts `Status = Ready` for those, as `/lc:next` does. If one is not Done, the board is wrong — say so, and give the runner-up instead.
+8. Then, **after** the code block, say plainly which single item to start today and why, in one or two sentences drawn from the arithmetic the script printed. Name one; do not hedge across five. Name no story the script did not print — a paraphrase has been observed to grow a row the script never produced, so if a story is not in the block above, it does not belong in your reply either.
+
+Before you send, check your reply against the block: the `Chain:` line and the `slack = ... = ...` line appear in it character-for-character, and every story ID you mention appears in the script's output. If either is false, you have rewritten the report — send the script's output instead.
 
 If the script exits 1, report its `FAIL` line and stop: a dependency cycle means nothing can be ranked until an edge is removed, and that edge is a human's call.
 
