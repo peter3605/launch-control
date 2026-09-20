@@ -1,0 +1,33 @@
+name: tests
+
+# Every pull request, and main itself. Before this workflow existed a PR here
+# ran zero checks, and /lc:done had to be told that was legitimate in this repo
+# and nowhere else. That carve-out is gone: the rule "an empty rollup is not a
+# pass" now means the same thing here as everywhere else.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Minutes are a budget. A new push supersedes the run it replaced.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unittest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # No setup-python and no pip install: the plugin ships no requirements
+      # file, the suite is stdlib only, and the runner's own python3 is the
+      # closest thing to the interpreter a user will actually run it under.
+      - name: Show interpreter
+        run: python3 -VV
+
+      - name: Run the suite
+        run: python3 -B -m unittest discover -s tests -t . -v

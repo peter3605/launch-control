@@ -27,7 +27,11 @@ PROPOSAL is the backlog the session drafted and the user reviewed:
                   "agent": true|false, "leadTime", "leadDays": [min, max],
                   "doneWhen", "notes",
                   "blockedBy": ["D0"], "clock": "<clock key, if it is one>",
+                  "leadDaysReason": "<why this clock's leadDays differ from clocks.json>",
                   "agentOverride": "<why an agent can do it despite the wording>"}]}
+
+A story with `clock` set is held to that entry in clocks.json: its leadDays must
+match unless leadDaysReason says why, and an omitted epic or estimate is the clock's.
 
 STATE is this run's ledger of what has been filed ({draft: {"id", "url"}}). It is
 what makes a run resumable after a failure, and it is counted when allocating
@@ -43,7 +47,13 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.dont_write_bytecode = True  # importing doctor must not litter the installed plugin
 sys.path.insert(0, os.path.join(HERE, "..", "doctor"))
-from doctor import load_json, read_page, remote_default_branch, git  # noqa: E402
+from doctor import CheckError, read_json, read_page, remote_default_branch, git  # noqa: E402
+
+
+class MissingDraft(CheckError):
+    """A proposed story with no `draft` ID. Deliberately not a ValueError: lint
+    reads a ValueError out of topo() as a dependency cycle, which this is not."""
+
 
 TYPES = ("Launch Blocker", "Backlog", "Chore")
 ESTIMATES = ("XS", "S", "M", "L", "XL")
@@ -117,7 +127,7 @@ def save_json(path, data):
 
 
 def load_state(path):
-    return load_json(path) if path and os.path.exists(path) else {}
+    return read_json(path, "the --state ledger") if path and os.path.exists(path) else {}
 
 
 def filed(state):
@@ -128,7 +138,7 @@ def filed(state):
 
 def board_ids(board_path):
     """Every Story ID in a board query result, and whether it was read to the end."""
-    raw = load_json(board_path)
+    raw = read_json(board_path, "the --board query result")
     pages = raw if isinstance(raw, list) else [raw]
     ids, complete = [], True
     base = os.path.dirname(os.path.abspath(board_path))
@@ -157,7 +167,26 @@ def words(text):
 
 # ------------------------------------------------------------------ clocks
 def load_clocks():
-    return load_json(os.path.join(HERE, "clocks.json"))["clocks"]
+    path = os.path.join(HERE, "clocks.json")
+    clocks = read_json(path, "clocks.json").get("clocks")
+    if not isinstance(clocks, list):
+        raise CheckError(f"clocks.json has no `clocks` list - the plugin install is damaged: {path}")
+    return clocks
+
+
+def with_clock(story, by_key):
+    """The story with its clock's epic and estimate filled in where the draft left them out."""
+    clock = by_key.get(story.get("clock"))
+    if not clock:
+        return story
+    return {**{k: clock[k] for k in ("epic", "estimate") if clock.get(k)},
+            **{k: v for k, v in story.items() if v not in (None, "")}}
+
+
+def diverges(story, clock):
+    """The clock's (min, max) if the story's leadDays differ from it, else None."""
+    theirs = tuple(clock["leadDays"])
+    return theirs if lead_days(story) is not None and lead_days(story) != theirs else None
 
 
 def repo_files(repo, limit=20000):
@@ -223,6 +252,21 @@ def detect_clocks(repo, source):
                     break
         if reason:
             hits.append((clock, reason))
+
+    # A clock's blockers are filed with it, so they trigger with it: a repo that
+    # takes payments needs the entity before Stripe whether or not it says "LLC".
+    by_key = {c["key"]: c for c in load_clocks()}
+    found = {c["key"] for c, _ in hits}
+    i = 0
+    while i < len(hits):
+        clock = hits[i][0]
+        for b in clock["blockedBy"]:
+            if b not in found:
+                found.add(b)
+                hits.append((by_key[b], f"blocks {clock['key']}"))
+        i += 1
+    order = list(by_key)
+    hits.sort(key=lambda h: order.index(h[0]["key"]))
     return hits
 
 
@@ -240,6 +284,8 @@ def cmd_clocks(args):
         print(f"    Lead days:  {clock['leadDays'][0]}-{clock['leadDays'][1]} calendar")
         print(f"    Done when:  {clock['doneWhen']}")
         print(f"    Notes:      {clock['notes']}")
+        for url in clock.get("sources", []):
+            print(f"    Source:     {url}")
     print(f"\n{len(hits)} clock(s). File each as Gating External, agent unchecked, with `clock` set to its key -")
     print("or list it in clocksDeclined with the reason this launch does not need it.")
     return 0
@@ -247,7 +293,16 @@ def cmd_clocks(args):
 
 # -------------------------------------------------------------------- lint
 def topo(stories):
-    """Drafts ordered blockers-first, or raise ValueError naming a cycle."""
+    """Drafts ordered blockers-first, or raise ValueError naming a cycle.
+
+    The proposal JSON is written by hand (see plan/`SKILL.md`), so a story with no
+    `draft` is an expected mistake, not a broken invariant. lint reports it before
+    calling here; this check is what keeps the other subcommands from a KeyError."""
+    missing = [s.get("name") or "(unnamed)" for s in stories if not s.get("draft")]
+    if missing:
+        raise MissingDraft(f"{len(missing)} story{'' if len(missing) == 1 else 's'} with no "
+                           f"`draft` ID: {', '.join(repr(n[:40]) for n in missing[:3])}"
+                           f"{', ...' if len(missing) > 3 else ''} - run `plan.py lint` for the full list")
     by = {s["draft"]: s for s in stories}
     seen, done, order = set(), set(), []
 
@@ -269,10 +324,12 @@ def topo(stories):
 
 
 def cmd_lint(args):
-    p = load_json(args.proposal)
+    p = read_json(args.proposal, "the proposal")
     print(f"Launch Control plan lint -> {args.proposal}")
     proj = p.get("project") or {}
-    stories = p.get("stories") or []
+    by_key = {c["key"]: c for c in load_clocks()}
+    drafted = p.get("stories") or []
+    stories = [with_clock(s, by_key) for s in drafted]
     epics = [e.strip() for e in args.epics.split(",")] if args.epics else None
 
     print("\nProject")
@@ -304,7 +361,14 @@ def cmd_lint(args):
         fail("no stories")
         return finish()
     drafts = [s.get("draft") for s in stories]
-    dupes = sorted({d for d in drafts if drafts.count(d) > 1})
+    # Everything below keys on `draft` - the dependency graph, the filing order, the
+    # payloads. A story without one is the expected hand-authoring slip, so it is
+    # named here rather than surfacing as a KeyError from topo().
+    nodraft = [(s.get("name") or "(unnamed)") for s in stories if not s.get("draft")]
+    for n in nodraft:
+        fail(f"{n[:50]!r}: no `draft` ID - every story needs one (D1, D2, ...); "
+             "blockedBy and the filing order are written in terms of it")
+    dupes = sorted({d for d in drafts if d and drafts.count(d) > 1})
     if dupes:
         fail(f"draft IDs used twice: {', '.join(map(str, dupes))}")
     names = [(s.get("name") or "").strip().lower() for s in stories]
@@ -376,17 +440,44 @@ def cmd_lint(args):
                 fail(f"{tag}: blocked by itself")
     if len(problems) == before:
         ok(f"{len(stories)} stories: fields valid, Done-when checkable, agent flags justified")
-    try:
-        topo(stories)
-        ok("dependency graph has no cycle")
-    except ValueError as e:
-        fail(f"dependency cycle: {e}")
+    if nodraft:
+        warn("dependency graph not checked - it is drawn in `draft` IDs, and some are missing")
+    else:
+        try:
+            topo(stories)
+            ok("dependency graph has no cycle")
+        except ValueError as e:
+            fail(f"dependency cycle: {e}")
 
     humans = [s for s in stories if s.get("agent") is False]
     if not humans:
         warn("every story is agent-doable - that is rare for a launch and empties /lc:mine; re-read each one")
 
     print("\nExternal clocks")
+    # A filed clock is only as good as the numbers it carries: /lc:mine ranks by leadDays
+    # and a wrong figure produces a confident wrong pick, not an error. So the story must
+    # say what clocks.json says, or say why this launch differs.
+    for raw, s in zip(drafted, stories):
+        k = s.get("clock")
+        if not k:
+            continue
+        tag = f"{s.get('draft')} clock {k!r}"
+        clock = by_key.get(k)
+        if not clock:
+            fail(f"{tag} is not in clocks.json - leave `clock` off a clock the dataset does not know")
+            continue
+        theirs = diverges(s, clock)
+        reason = (s.get("leadDaysReason") or "").strip()
+        if theirs and len(reason.split()) < 3:
+            fail(f"{tag}: leadDays {list(lead_days(s))} but clocks.json says {list(theirs)} - "
+                 "match it, or give leadDaysReason saying why this launch differs")
+        elif theirs:
+            ok(f"{tag}: leadDays {list(lead_days(s))} differ from clocks.json {list(theirs)}: {reason}")
+        elif reason:
+            warn(f"{tag}: leadDaysReason given but leadDays match clocks.json - drop it")
+        for field in ("epic", "estimate"):
+            if raw.get(field) and clock.get(field) and raw[field] != clock[field]:
+                warn(f"{tag}: {field} {raw[field]!r} overrides the clock's {clock[field]!r}")
     if args.repo or args.source:
         declined = p.get("clocksDeclined") or {}
         filed = {s.get("clock") for s in stories if s.get("clock")}
@@ -422,7 +513,7 @@ def id_number(prefix, series, sid):
 
 
 def cmd_order(args):
-    p = load_json(args.proposal)
+    p = read_json(args.proposal, "the proposal")
     state = filed(load_state(args.state))
     for d in topo(p["stories"]):
         if d not in state:
@@ -431,7 +522,7 @@ def cmd_order(args):
 
 
 def cmd_next_id(args):
-    p = load_json(args.proposal)
+    p = read_json(args.proposal, "the proposal")
     state = filed(load_state(args.state))
     story = next((s for s in p["stories"] if s["draft"] == args.draft), None)
     if not story:
@@ -458,13 +549,21 @@ def cmd_next_id(args):
 
 
 def cmd_payload(args):
-    p = load_json(args.proposal)
+    p = read_json(args.proposal, "the proposal")
     state = filed(load_state(args.state))
     stories = p["stories"]
-    story = next((s for s in stories if s["draft"] == args.draft), None)
+    by_key = {c["key"]: c for c in load_clocks()}
+    story = next((with_clock(s, by_key) for s in stories if s["draft"] == args.draft), None)
     if not story:
         print(f"no draft {args.draft!r} in the proposal", file=sys.stderr)
         return 1
+    notes = story.get("notes") or ""
+    theirs = diverges(story, by_key[story["clock"]]) if story.get("clock") in by_key else None
+    if theirs:
+        # On the board, so a reader can tell a researched departure from an invented number.
+        lo, hi = lead_days(story)
+        notes = (f"Lead days {lo}-{hi} differ from the `clocks.json` figure {theirs[0]}-{theirs[1]}: "
+                 f"{story.get('leadDaysReason', '').strip()}" + (f"\n\n{notes}" if notes else ""))
     blockers = []
     for b in story.get("blockedBy") or []:
         if b not in state:
@@ -486,7 +585,7 @@ def cmd_payload(args):
         "Lead days min": (lead_days(story) or (None, None))[0],
         "Lead days max": (lead_days(story) or (None, None))[1],
         "Done when": story["doneWhen"],
-        "Notes and traps": story.get("notes") or "",
+        "Notes and traps": notes,
         "Seq": seq,
         "Blocked by": blockers,
         # Every blocker in a fresh plan is a story this run just filed, so none is Done.
@@ -535,13 +634,13 @@ def cmd_config(args):
     repo = os.path.abspath(args.repo)
     claude = os.path.join(repo, ".claude")
     target = os.path.join(claude, "launch-control.json")
-    sib = load_json(args.from_)
+    sib = read_json(args.from_, "the --from sibling config")
     print(f"Launch Control plan config -> {target}")
 
     page_id = re.findall(r"[0-9a-f]{32}", args.project_page.replace("-", ""))
     page_id = page_id[-1] if page_id else args.project_page
     if os.path.exists(target):
-        have = load_json(target)
+        have = read_json(target, "the existing launch-control.json")
         if have.get("prefix") == args.prefix and (have.get("projectPageId") or "").replace("-", "") == page_id:
             ok("already written for this project - leaving it as it is")
             return finish()
@@ -560,7 +659,8 @@ def cmd_config(args):
     if problems:
         return finish()
 
-    version = load_json(os.path.join(HERE, "..", "..", ".claude-plugin", "plugin.json")).get("version", "")
+    version = read_json(os.path.join(HERE, "..", "..", ".claude-plugin", "plugin.json"),
+                        "the plugin's plugin.json").get("version", "")
     is_git = bool(git(repo, "rev-parse", "--git-dir"))
     base, source = remote_default_branch(repo) if is_git else ("", "")
     if is_git and not base:
@@ -666,5 +766,20 @@ def main():
     }[args.cmd](args)
 
 
+def cli():
+    """Every subcommand exits 1 on a failure - and says what failed.
+
+    A traceback keeps the exit code's promise while breaking the useful half of it,
+    so the anticipated failures come back through here as a FAIL line instead."""
+    try:
+        return main()
+    except CheckError as e:
+        print(f"  FAIL  {e}")
+        return 1
+    except KeyboardInterrupt:
+        print("\n  FAIL  interrupted")
+        return 130
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(cli())

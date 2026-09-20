@@ -5,3 +5,5 @@
 .claude/launch-control.local.json
 .claude/.current-story
 .claude/.nudged
+__pycache__/
+*.pyc
