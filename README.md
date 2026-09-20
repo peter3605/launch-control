@@ -190,9 +190,9 @@ no self-hosted backend and no export command yet.
 | It can | When | Governed by |
 |---|---|---|
 | Create a branch, write `.claude/.current-story` | `/lc:start` | — |
-| Commit and push a branch | `/lc:done` | — |
-| **Open a pull request against your base branch** | `/lc:done` | `git.baseBranch` picks the target |
-| **Merge that pull request and delete the branch** | `/lc:done` | `git.autoMerge` — **`false` unless you change it** |
+| Commit and push a branch | `/lc:done` | `git.enabled` — **`false` stops all three below** |
+| **Open a pull request against your base branch** | `/lc:done` | `git.enabled`; `git.baseBranch` picks the target |
+| **Merge that pull request and delete the branch** | `/lc:done` | `git.enabled`, then `git.autoMerge` — **`false` unless you change it** |
 | Block a session from exiting silently | `Stop` hook, once per story | fires once per story, then never again |
 
 **Merging is off by default.** Both `/lc:init` and `/lc:plan` write `autoMerge: false`
@@ -200,6 +200,12 @@ into a new repo's config, so out of the box `/lc:done` stops at a green PR, sets
 story `In Review`, and leaves the merge to you. Setting `mergeIsDeploy: true` makes it
 stop that way permanently, green or not. It stages deliberately and never runs
 `git add -A`, and it never merges with `--admin` or past a failing check.
+
+**`git.enabled: false` is the bigger hammer**, and the one to reach for if you want the
+board without the shipping: `/lc:done` then verifies the story and records it, but makes
+no commit, no push and no PR at all, leaving the change in your working tree. `/lc:plan`
+and `/lc:init` set it true for any git repo, so it is opt-out, not opt-in — set it
+yourself if you want it.
 
 These live in the `git` block of `.claude/launch-control.json`; the full set, including
 `enabled`, is in [`docs/config-reference.md`](docs/config-reference.md).
@@ -370,7 +376,7 @@ opening a PR. See [`docs/config-reference.md`](docs/config-reference.md).
 
 ## Status
 
-v0.5.6, and honest about it: still pre-1.0, extracted from a working setup managing
+v0.5.9, and honest about it: still pre-1.0, extracted from a working setup managing
 five projects, and has one real user. The board is provisioned by `/lc:init`; projects on it are provisioned by `/lc:plan`.
 
 What this is *not* is a tracker for the steps inside a story. Keep those wherever
