@@ -21,6 +21,71 @@ So Launch Control tracks two kinds of work in one board:
 
 The second one is the point. Nothing else reports it.
 
+## Quickstart
+
+Five steps. Three of them are yours to do in a browser, and no script can do them
+for you — Notion's OAuth, sharing the page, and turning on updates.
+
+**1. Set the machine up.** Clone this repo, then:
+
+```
+./setup.sh              # dry run: says what it would do, changes nothing
+./setup.sh --apply      # does the automatable parts
+```
+
+It checks `claude`, `python3`, `git` and `gh`, adds the Notion MCP server, adds
+this marketplace and installs the plugin — skipping anything already in place, so
+running it twice is safe. It stops at the first hard requirement that is missing
+and names it. Then it prints steps 2–4 below as work still to do, because it
+cannot do them and will not claim it did.
+
+**2. Authorise Notion.** Run `/mcp` inside Claude Code (or `claude mcp login
+notion`) and finish Notion's OAuth flow in the browser. Step 1 *configured* the
+connector; this is what grants it access.
+
+**3. Share the page the board will live under.** In Notion, open that page →
+`···` → **Add connections** → the Notion connector. Connectors see only what you
+share with them. Skipping this is the failure that looks like a working connector
+returning nothing, and it is the most common way to arrive at a broken `/lc:init`.
+
+**4. Turn on auto-update for this marketplace.** `/plugin` → Marketplaces →
+`launch-control` → Enable auto-update, or set `"autoUpdate": true` under
+`extraKnownMarketplaces` in your settings. **Third-party marketplaces do not
+auto-update.** Official Anthropic ones do; this one is not one of those, so
+without this you stay on the version you installed today, indefinitely — and the
+first symptom is a command behaving like a version you no longer have.
+
+**5. Build the board, then pull the first story.** In the repo you want tracked:
+
+```
+/lc:init          provisions both Notion databases, every property and every
+                  view, checks what it built, and writes this repo's config
+/lc:next          hands you the first story a session can actually do
+```
+
+For the second repo and every repo after it, `/lc:plan` replaces `/lc:init` — see
+[Install](#install).
+
+About half an hour from nothing, most of it Notion-side account setup that has
+nothing to do with this plugin; about five minutes if Notion is already connected.
+
+**Where to go next**
+
+| | |
+|---|---|
+| [docs/getting-started.md](docs/getting-started.md) | The same path at length: zero to a first story marked Done, with real output |
+| [docs/troubleshooting.md](docs/troubleshooting.md) | The failures with names, including all three ways the Notion connector can be half-set-up |
+| [docs/config-reference.md](docs/config-reference.md) | Every key in `.claude/launch-control.json` |
+| [docs/notion-schema.md](docs/notion-schema.md) | The two databases, their properties, and the views each command reads |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Running the suite, the version-bump rule, what a PR needs |
+| [CHANGELOG.md](CHANGELOG.md) | What changed in each version |
+
+Moving a repo that predates the plugin, with Launch Control's commands copied into
+its own `.claude/`? That is a different job and a different script: `./migrate.sh`,
+described under [Install](#install).
+
+## What it prints that nothing else does
+
 Here is what it printed for a real iOS app on 2026-09-16, with its names changed
 so the project is not identifiable:
 
@@ -88,7 +153,7 @@ before the install commands below, not after.
 | **A Notion account** | The board *is* a Notion database. The free plan is enough — every command queries views in view mode, which is unmetered; nothing here uses billed SQL mode | No board |
 | **Notion connected as an MCP connector in Claude Code** | Every single command reads or writes the board through Notion's MCP tools. There is no local or offline mode | `/lc:init` stops at pre-flight and names this |
 | **That connector authorised on the page the board lives under** | Notion connectors see only the pages you share with them. Connected-but-unshared fails the same way as not connected | `/lc:init` stops at pre-flight and names this |
-| **`python3` on `PATH`** | Every skill shells out to it; so do both hooks and `install.sh` | `install.sh` stops at step 0. Hooks fail quietly |
+| **`python3` on `PATH`** | Every skill shells out to it; so do both hooks, `setup.sh` and `migrate.sh` | `setup.sh` stops and names it; `migrate.sh` stops at step 0. Hooks fail quietly |
 | **`git`** | `/lc:start` cuts the branch, `/lc:done` commits | `/lc:start` and `/lc:done` |
 | **`gh`, authenticated** | `/lc:done` only — it pushes, opens the PR, and reads the check rollup | `/lc:done` only. Everything else works |
 
@@ -212,7 +277,7 @@ These live in the `git` block of `.claude/launch-control.json`; the full set, in
 
 Outside `.claude/`, the only file any of this touches is `.gitignore`, to which
 `/lc:init` and `/lc:plan` append the four lines listed below. The one exception is
-`install.sh --apply`, used only for the copied-files migration: on top of its own
+`migrate.sh --apply`, used only for the copied-files migration: on top of its own
 `.gitignore` lines it rewrites bare `/next`-style command references in `CLAUDE.md` to
 the `/lc:` namespace, and moves the old copied commands and hooks into
 `.claude/_pre-plugin/` rather than deleting them. Its dry run is the default and prints
@@ -235,7 +300,7 @@ below, every file Launch Control creates in a repo is under `.claude/`:
 .claude/.nudged                       # the Stop hook's once-per-story guard
 .claude/lc-plan/                      # /lc:plan's proposal and resume state
 .claude/lc-init/                      # /lc:init's ledger; ignores itself, so gitignore has no line for it
-.claude/_pre-plugin/                  # only if you migrated with install.sh
+.claude/_pre-plugin/                  # only if you migrated with migrate.sh
 ```
 
 And remove the four lines appended to `.gitignore`. `/lc:init` and `/lc:plan` add:
@@ -247,10 +312,10 @@ And remove the four lines appended to `.gitignore`. `/lc:init` and `/lc:plan` ad
 .claude/lc-plan/
 ```
 
-`install.sh` adds the same first three plus `.claude/_pre-plugin/`, so a repo that was
+`migrate.sh` adds the same first three plus `.claude/_pre-plugin/`, so a repo that was
 migrated may have five lines rather than four.
 
-Two leftovers to know about. `install.sh` rewrote `CLAUDE.md` command references to
+Two leftovers to know about. `migrate.sh` rewrote `CLAUDE.md` command references to
 `/lc:next` and friends; that is not reverted for you, so fix them by hand if you care.
 And removing `.claude/launch-control.json` alone is enough to silence Launch Control
 even with the plugin still installed — both hooks open with
@@ -271,29 +336,50 @@ intact.
 
 ## Install
 
+`./setup.sh --apply` in [Quickstart](#quickstart) does this for you and skips
+whatever is already in place. The two commands it runs, if you would rather run
+them yourself inside Claude Code:
+
 ```
 /plugin marketplace add peter3605/launch-control
 /plugin install lc@launch-control
 ```
 
-No board yet? Run `/lc:init` in your first repo: it creates the Notion databases,
-every property and view the commands read, and that repo's config, then checks
-what it built against the schema. For every repo after that, run
-`/lc:plan <design doc or repo path> --board <first repo>/.claude/launch-control.json`
-in it: it creates the project, its road view and `.claude/launch-control.json`, and
-files the backlog. To bring over a repo that used the older copied-files layout,
-create `.claude/launch-control.json` from
+Either way, turn on auto-update for the marketplace afterwards — step 4 of the
+Quickstart. Third-party marketplaces do not update themselves.
+
+**The first repo.** Run `/lc:init` in it: it creates the Notion databases, every
+property and view the commands read, and that repo's config, then checks what it
+built against the schema.
+
+**Every repo after that.** Run, in that repo:
+
+```
+/lc:plan <design doc or repo path> --board <first repo>/.claude/launch-control.json
+```
+
+It creates the project, its road view and `.claude/launch-control.json`, and files
+the backlog.
+
+**A repo that predates the plugin**, with Launch Control's commands and hooks
+copied into its own `.claude/` directory, is the one case `/lc:plan` does not
+cover. Create `.claude/launch-control.json` from
 [`examples/launch-control.example.json`](examples/launch-control.example.json)
-and run:
+and run the migration script — not the setup script, which sets up a machine
+rather than a repo:
 
 ```
-./install.sh /path/to/your/repo            # dry run
-./install.sh /path/to/your/repo --apply
+./migrate.sh /path/to/your/repo            # dry run
+./migrate.sh /path/to/your/repo --apply
 ```
 
-`--apply` refuses, changing nothing, while that repo has a story bound in
-`.claude/.current-story` or uncommitted changes under `.claude/` or to `.gitignore`:
-a live session editing the same files can undo the install's ignore lines.
+It retires the copied commands and hooks into `.claude/_pre-plugin/` rather than
+deleting them, splits any private `notice` out, and stamps the plugin version into
+that repo as its drift baseline. `--apply` refuses, changing nothing, while that
+repo has a story bound in `.claude/.current-story` or uncommitted changes under
+`.claude/` or to `.gitignore`: a live session editing the same files can undo the
+migration's ignore lines. This script was called `install.sh` until 0.6.0; that
+name is now a shim that points at these two.
 
 [`docs/notion-schema.md`](docs/notion-schema.md) describes the two databases, the
 properties that carry weight, and the views each command reads.
@@ -335,7 +421,7 @@ pretend otherwise:
 - It has not been tested. The one attempt was invalid: the repo it ran in had
   already been migrated, so there were no project-side hooks left to observe.
 
-**On a standard install the question does not arise.** `install.sh --apply` removes
+**On a standard install the question does not arise.** `migrate.sh --apply` removes
 the old copied Launch Control hooks from the target's `.claude/settings.json`
 (step 3), because leaving them beside the plugin's would at best fire twice.
 
@@ -357,7 +443,7 @@ the old copied Launch Control hooks from the target's `.claude/settings.json`
 ## Per-repo policy
 
 The commands and hooks are identical everywhere, and are not meant to be edited
-per repo — `install.sh` treats a local edit as drift to be propagated back. The
+per repo — `migrate.sh` treats a local edit as drift to be propagated back. The
 intended extension point is the `git` block of `.claude/launch-control.json`,
 which is where everything that differs between repos lives:
 
@@ -376,7 +462,7 @@ opening a PR. See [`docs/config-reference.md`](docs/config-reference.md).
 
 ## Status
 
-v0.5.9, and honest about it: still pre-1.0, extracted from a working setup managing
+v0.6.0, and honest about it: still pre-1.0, extracted from a working setup managing
 five projects, and has one real user. The board is provisioned by `/lc:init`; projects on it are provisioned by `/lc:plan`.
 
 That version is carried in three places - `plugins/lc/.claude-plugin/plugin.json`,
@@ -385,7 +471,7 @@ apart twice. `python3 tests/check_version_sync.py` is the check that says so: it
 exits non-zero while the three disagree, naming each value and the file it came
 from, and 0 once they agree. CI runs it on every pull request. The rule it
 enforces is blanket equality, argued in the script's own docstring: bump
-plugin.json first, because `install.sh` stamps it into each installed repo as
+plugin.json first, because `migrate.sh` stamps it into each installed repo as
 that repo's drift baseline, and bring the other two along in the same commit.
 
 What this is *not* is a tracker for the steps inside a story. Keep those wherever

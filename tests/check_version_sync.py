@@ -24,7 +24,7 @@ marketplace ships exactly one plugin and exists only to ship it, so a
 marketplace version sitting behind the plugin's tells a browsing stranger
 something untrue; and the README Status line is the first version a stranger
 reads about how mature this is. plugin.json is the one that moves first,
-because install.sh stamps it into each installed repo as that repo's drift
+because migrate.sh stamps it into each installed repo as that repo's drift
 baseline - the other two follow it in the same commit.
 """
 import json
@@ -127,7 +127,7 @@ def main(argv):
         "VERSION DRIFT: the three version records disagree.\n"
         "%s\n"
         "\nAll three must carry the same version and move in the same commit.\n"
-        "install.sh stamps plugin.json's version into each installed repo as\n"
+        "migrate.sh stamps plugin.json's version into each installed repo as\n"
         "that repo's drift baseline, so a stale record makes the drift check\n"
         "there report agreement it has not checked.\n" % table)
     return 1
