@@ -7,3 +7,4 @@
 .claude/.nudged
 __pycache__/
 *.pyc
+.claude/_pre-plugin/
