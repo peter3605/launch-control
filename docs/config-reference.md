@@ -61,7 +61,7 @@ nothing merges it over the shared file for the commands. What loads it:
 |---|---|
 | `hooks/session-start.sh` | Appends its `notice` after the shared one. It also copies every other top-level key over the shared config, but a shallow copy (a local `git` block would replace the shared one whole), and the hook only prints `project` and `prefix` from the result |
 | `skills/doctor/doctor.py` | Checks it is valid JSON, and runs the stale-story check on its `notice` |
-| `install.sh` | Creates it, moving a `notice` out of the shared file on first install. Never reads anything else from it |
+| `migrate.sh` | Creates it, moving a `notice` out of the shared file on first migration. Never reads anything else from it |
 
 Every skill — at minimum `/lc:done`, `/lc:next` and `/lc:start` — reads
 `.claude/launch-control.json` directly and **never sees the local file**. A
