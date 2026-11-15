@@ -64,6 +64,45 @@ quietly stopped checking.
 changes do not need one. The full argument is in `tests/check_version_sync.py`'s
 own docstring.
 
+## Cutting a release
+
+A version bump **is** a release: installed copies update only when `plugin.json`'s
+version changes ([decision 0002](docs/decisions/0002-release-ref.md)). So every
+version that reaches `main` is tagged and released, in this order:
+
+1. **Merge** the pull request that bumps the version, with its `CHANGELOG.md`
+   entry, once CI is green.
+2. **Tag** the merge commit on `main`, annotated, as `v<version>`, and push the
+   tag:
+
+   ```sh
+   git checkout main && git pull
+   V=$(python3 -c 'import json; print(json.load(open("plugins/lc/.claude-plugin/plugin.json"))["version"])')
+   git tag -a "v$V" -m "v$V"
+   git push origin "v$V"
+   ```
+
+   If more commits land under the same version before anything is tagged, tag the
+   last one that still carries it. Never move a tag once pushed.
+3. **Release** it, with that version's `CHANGELOG.md` entry as the body:
+
+   ```sh
+   python3 - "$V" > /tmp/notes.md <<'PY'
+   import re, sys
+   text = open("CHANGELOG.md").read()
+   m = re.search(r"^## " + re.escape(sys.argv[1]) + r" .*?$(.*?)(?=^## |\Z)", text, re.M | re.S)
+   print(m.group(1).strip().rstrip("-").strip())
+   PY
+   gh release create "v$V" --title "v$V" --notes-file /tmp/notes.md --verify-tag
+   ```
+
+4. **Check:** `git ls-remote --tags origin "v$V"` prints a line, and
+   `gh release view "v$V"` exits 0.
+
+**Who:** Peter, or a session he has told to. The tag and the release are public,
+so a session confirms with him before pushing either. Versions 0.1.0 to 0.9.0 were
+backfilled on 2026-11-15, each tag on the last `main` commit carrying that version.
+
 ## Shell scripts
 
 `setup.sh`, `migrate.sh` and the two hooks must parse and run under **stock macOS
