@@ -22,6 +22,8 @@
 # PORTABILITY: this must parse and run under stock macOS /bin/bash, which is
 # 3.2 (2007). No associative arrays, no ${var,,}, no mapfile, no |&. Check any
 # edit with `/bin/bash -n setup.sh`, not with whatever bash is on PATH.
+#
+# PLATFORMS: macOS and Linux (including WSL). On anything else it stops first.
 set -euo pipefail
 
 MARKETPLACE_NAME="launch-control"
@@ -35,7 +37,7 @@ for arg in "$@"; do
   case "$arg" in
     --apply) DRY=0 ;;
     -h|--help)
-      sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'
+      sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *)
@@ -67,6 +69,31 @@ die_missing() {
 
 # First line only. `gh --version` prints three.
 first_line() { printf '%s\n' "$1" | sed -n '1p'; }
+
+# ------------------------------------------------------- 0. the platform
+# macOS and Linux only (WSL reports Linux, so it passes). On native Windows the
+# plugin installs cleanly and its hooks then do nothing, silently, by design:
+# they are bash scripts that call python3 and never fail a session. This is the
+# one place that can say "unsupported" out loud, so it does, before step 1 and
+# before anything is run or changed. MINGW*/MSYS*/CYGWIN* are Git Bash and
+# friends on Windows; anything else unrecognised is refused the same way rather
+# than guessed at.
+PLATFORM="$(uname -s 2>/dev/null || echo unknown)"
+case "$PLATFORM" in
+  Darwin|Linux) : ;;
+  *)
+    say "Launch Control setup"
+    say ""
+    say "  STOPPING: unsupported platform \`$PLATFORM\` (from uname -s)."
+    say "  Launch Control supports macOS and Linux. Native Windows (Git Bash, MSYS,"
+    say "  Cygwin) is untested and unsupported: the plugin would install, and its"
+    say "  hooks would then do nothing without saying so. On Windows, run Claude Code"
+    say "  and this script inside WSL, where uname -s reports Linux."
+    say ""
+    say "  Nothing has been changed."
+    exit 1
+    ;;
+esac
 
 say "Launch Control setup"
 if [ "$DRY" -eq 1 ]; then
