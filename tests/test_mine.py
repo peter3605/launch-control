@@ -13,6 +13,8 @@ import hashlib
 import io
 import json
 import os
+import re
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -425,3 +427,51 @@ def u_id(sid):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ShippedSample(unittest.TestCase):
+    """LC-B11: the README tells a stranger to run mine.py on examples/sample-board.json.
+
+    Run it the way the README says, as a subprocess against the real file, so a
+    change to mine.py's input format that orphans the sample turns the build red
+    instead of breaking the first thing a visitor tries. --today pins the dates;
+    the README's command omits it, so the headings are what is asserted, plus the
+    few facts the README's prose claims about the sample.
+    """
+
+    SAMPLE = os.path.join(REPO, "examples", "sample-board.json")
+
+    def run_sample(self, *extra):
+        return subprocess.run(
+            [sys.executable, "-B", os.path.join(MINE_DIR, "mine.py"), "--view", self.SAMPLE, *extra],
+            capture_output=True, text=True, cwd=REPO,
+        )
+
+    def test_the_readme_command_prints_all_three_sections(self):
+        for extra in ((), ("--today", "2026-09-16")):
+            p = self.run_sample(*extra)
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            for heading in ("CLOCKS", "YOUR DESK", "START TODAY"):
+                self.assertIn(heading, p.stdout, f"{heading} missing with args {extra}")
+
+    def test_the_sample_shows_what_the_readme_says_it_shows(self):
+        p = self.run_sample("--today", "2026-09-16")
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        out = p.stdout
+        # A ranked clock with a blocker chain behind it.
+        self.assertIn("waits on HX-15, HX-19", out)
+        # An External item with no Lead days, listed rather than guessed.
+        self.assertIn("Unranked", out)
+        # Two self-serve desk items, and a pick with its arithmetic.
+        desk = out.split("YOUR DESK", 1)[1].split("START TODAY", 1)[0]
+        self.assertEqual(len([l for l in desk.splitlines() if l.startswith("  HX-")]), 2, desk)
+        self.assertIn("slack = 42 - 42 = 0", out)
+
+    def test_the_sample_carries_no_real_notion_ids(self):
+        # Public repo: every page id in the sample is a visible placeholder.
+        with open(self.SAMPLE) as f:
+            text = f.read()
+        ids = set(re.findall(r"[0-9a-f]{32}", text))
+        self.assertTrue(ids)
+        for i in ids:
+            self.assertTrue(i.startswith("5a3b1e0000000000"), f"{i} does not look like a placeholder id")

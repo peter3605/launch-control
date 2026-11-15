@@ -21,6 +21,26 @@ So Launch Control tracks two kinds of work in one board:
 
 The second one is the point. Nothing else reports it.
 
+## See it first: ten seconds, no Notion
+
+Before you install anything, clone this repo and run `/lc:mine`'s ranking script on
+the sample board that ships with it:
+
+```
+python3 plugins/lc/skills/mine/mine.py --view examples/sample-board.json
+```
+
+You need only `python3`: no Notion, no plugin, no Claude Code.
+[`examples/sample-board.json`](examples/sample-board.json) is an anonymised
+**Your turn** view for a made-up iOS app. It has a long partner-approval clock, an
+App Store submission waiting on two other clocks, a clock nobody has given lead
+days yet, and two items on your desk. The script prints the same three sections
+`/lc:mine` shows you: **CLOCKS**, **YOUR DESK** and **START TODAY**.
+
+The finish dates count from today, so they change every day you run it. Add
+`--today 2026-09-16` to pin them. A real board's output is shown
+[below](#what-it-prints-that-nothing-else-does).
+
 ## Quickstart
 
 Five steps. Three of them are yours to do in a browser, and no script can do them

@@ -1,0 +1,146 @@
+{
+  "results": [
+    {
+      "Story ID": "HX-09",
+      "Name": "Submit the partner API production-access application",
+      "Status": "Ready",
+      "Type": "Launch Blocker",
+      "Gating": "External",
+      "Agent can do this": "__NO__",
+      "Estimate": "S",
+      "Lead time": "Partner reviews by hand; their docs say 2-6 weeks",
+      "Lead days min": 14,
+      "Lead days max": 42,
+      "Blocked by": [],
+      "Project": [
+        "https://app.notion.com/p/5a3b1e00000000000000000000000000"
+      ],
+      "url": "https://app.notion.com/p/5a3b1e00000000000000000000000009"
+    },
+    {
+      "Story ID": "HX-15",
+      "Name": "Create the App Store Connect app record",
+      "Status": "Ready",
+      "Type": "Launch Blocker",
+      "Gating": "External",
+      "Agent can do this": "__NO__",
+      "Estimate": "XS",
+      "Lead time": "Usually instant; occasionally held for a day",
+      "Lead days min": 0,
+      "Lead days max": 1,
+      "Blocked by": [],
+      "Project": [
+        "https://app.notion.com/p/5a3b1e00000000000000000000000000"
+      ],
+      "url": "https://app.notion.com/p/5a3b1e0000000000000000000000000f"
+    },
+    {
+      "Story ID": "HX-19",
+      "Name": "Upload the first build to TestFlight and pass beta review",
+      "Status": "Backlog",
+      "Type": "Launch Blocker",
+      "Gating": "External",
+      "Agent can do this": "__NO__",
+      "Estimate": "S",
+      "Lead time": "Beta app review, typically under 48 hours",
+      "Lead days min": 1,
+      "Lead days max": 2,
+      "Blocked by": [
+        "https://app.notion.com/p/5a3b1e0000000000000000000000000f"
+      ],
+      "Project": [
+        "https://app.notion.com/p/5a3b1e00000000000000000000000000"
+      ],
+      "url": "https://app.notion.com/p/5a3b1e00000000000000000000000013"
+    },
+    {
+      "Story ID": "HX-21",
+      "Name": "Submit for App Store review",
+      "Status": "Backlog",
+      "Type": "Launch Blocker",
+      "Gating": "External",
+      "Agent can do this": "__NO__",
+      "Estimate": "S",
+      "Lead time": "App Review currently quoted at 1-7 days",
+      "Lead days min": 1,
+      "Lead days max": 7,
+      "Blocked by": [
+        "https://app.notion.com/p/5a3b1e0000000000000000000000000f",
+        "https://app.notion.com/p/5a3b1e00000000000000000000000013"
+      ],
+      "Project": [
+        "https://app.notion.com/p/5a3b1e00000000000000000000000000"
+      ],
+      "url": "https://app.notion.com/p/5a3b1e00000000000000000000000015"
+    },
+    {
+      "Story ID": "HX-08",
+      "Name": "Request SES production access to leave the sandbox",
+      "Status": "Ready",
+      "Type": "Launch Blocker",
+      "Gating": "External",
+      "Agent can do this": "__NO__",
+      "Estimate": "XS",
+      "Lead time": "AWS support case, 24-48 hours",
+      "Lead days min": 1,
+      "Lead days max": 2,
+      "Blocked by": [],
+      "Project": [
+        "https://app.notion.com/p/5a3b1e00000000000000000000000000"
+      ],
+      "url": "https://app.notion.com/p/5a3b1e00000000000000000000000008"
+    },
+    {
+      "Story ID": "HX-06",
+      "Name": "Rotate both partner API keys, then deploy",
+      "Status": "Ready",
+      "Type": "Launch Blocker",
+      "Gating": "External",
+      "Agent can do this": "__NO__",
+      "Estimate": "S",
+      "Lead time": "One partner issues keys by request, not self-service - lead time unknown",
+      "Lead days min": null,
+      "Lead days max": null,
+      "Blocked by": [],
+      "Project": [
+        "https://app.notion.com/p/5a3b1e00000000000000000000000000"
+      ],
+      "url": "https://app.notion.com/p/5a3b1e00000000000000000000000006"
+    },
+    {
+      "Story ID": "HX-07",
+      "Name": "Back up the encryption key outside the secrets store",
+      "Status": "Ready",
+      "Type": "Chore",
+      "Gating": "Self-serve",
+      "Agent can do this": "__NO__",
+      "Estimate": "XS",
+      "Lead time": "",
+      "Lead days min": null,
+      "Lead days max": null,
+      "Blocked by": [],
+      "Project": [
+        "https://app.notion.com/p/5a3b1e00000000000000000000000000"
+      ],
+      "url": "https://app.notion.com/p/5a3b1e00000000000000000000000007"
+    },
+    {
+      "Story ID": "HX-10",
+      "Name": "Do the timed restore drill and record the RTO",
+      "Status": "In Progress",
+      "Type": "Launch Blocker",
+      "Gating": "Self-serve",
+      "Agent can do this": "__NO__",
+      "Estimate": "M",
+      "Lead time": "",
+      "Lead days min": null,
+      "Lead days max": null,
+      "Blocked by": [],
+      "Project": [
+        "https://app.notion.com/p/5a3b1e00000000000000000000000000"
+      ],
+      "url": "https://app.notion.com/p/5a3b1e0000000000000000000000000a"
+    }
+  ],
+  "has_more": false
+}

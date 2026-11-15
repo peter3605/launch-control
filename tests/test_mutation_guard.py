@@ -74,8 +74,9 @@ MUTATIONS = [
 
 
 def build_tree(dest, mutate=None):
-    """A runnable copy of the tree: the plugin scripts plus this suite."""
-    for sub in ("plugins", "tests"):
+    """A runnable copy of the tree: the plugin scripts, this suite, and the
+    examples test_mine runs against (LC-B11's sample board)."""
+    for sub in ("plugins", "tests", "examples"):
         shutil.copytree(
             os.path.join(REPO, sub), os.path.join(dest, sub),
             ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
