@@ -493,31 +493,14 @@ opening a PR. See [`docs/config-reference.md`](docs/config-reference.md).
 
 ## Status
 
-v0.7.0, and honest about it: still pre-1.0, extracted from a working setup managing
-five projects, and has one real user. The board is provisioned by `/lc:init`; projects on it are provisioned by `/lc:plan`.
-
-That version is carried in three places - `plugins/lc/.claude-plugin/plugin.json`,
-`.claude-plugin/marketplace.json`, and the line just above - and it has drifted
-apart twice. `python3 tests/check_version_sync.py` is the check that says so: it
-exits non-zero while the three disagree, naming each value and the file it came
-from, and 0 once they agree. CI runs it on every pull request. The rule it
-enforces is blanket equality, argued in the script's own docstring: bump
-plugin.json first, because `migrate.sh` stamps it into each installed repo as
-that repo's drift baseline, and bring the other two along in the same commit.
+v0.7.0: pre-1.0, extracted from a working setup that manages five projects. The
+board is provisioned by `/lc:init`; projects on it are provisioned by `/lc:plan`.
 
 What this is *not* is a tracker for the steps inside a story. Keep those wherever
 your agent already keeps them. Launch Control tracks **stories**, and the one thing
 it offers that nothing else does is the human-work critical path in `/lc:mine`: the
 launch blockers no agent can do, ordered by how long the outside world takes to
 answer. Persistence, a dependency graph and auto-promotion are plumbing in service
-of that, not the reason to use it.
+of that, not the reason to use it ([why](docs/decisions/0001-native-tasks.md)).
 
-If you are wondering why this doesn't just defer to Claude Code's native Tasks: as
-of **2026-09-17** those tools are not available by default on current models.
-`TaskCreate`, `TaskList`, `TodoWrite` and the rest ship only on Claude 3.x, Opus
-4.0–4.7, Sonnet 4.0–4.6 and Haiku 4.5, and need `CLAUDE_CODE_ENABLE_TODO_TOOLS=1`
-anywhere else. Don't plan around their being there. Sources, and the date that was
-last checked, are in
-[`docs/decisions/0001-native-tasks.md`](docs/decisions/0001-native-tasks.md).
-
-MIT.
+MIT. Contributing, including the version-bump rule: [`CONTRIBUTING.md`](CONTRIBUTING.md).
