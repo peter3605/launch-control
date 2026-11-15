@@ -55,13 +55,19 @@ auto-update.** Official Anthropic ones do; this one is not one of those, so
 without this you stay on the version you installed today, indefinitely — and the
 first symptom is a command behaving like a version you no longer have.
 
-**5. Build the board, then pull the first story.** In the repo you want tracked:
+**5. Build the board, file some work, then pull the first story.** In the repo you
+want tracked:
 
 ```
 /lc:init          provisions both Notion databases, every property and every
                   view, checks what it built, and writes this repo's config
+/lc:groom <item>  files one piece of work as a story, with its Done when
 /lc:next          hands you the first story a session can actually do
 ```
+
+`/lc:init` deliberately builds an empty board, so `/lc:next` has nothing to hand
+you until something is filed. `/lc:groom` files one item; `/lc:plan <doc or repo>`
+files a whole backlog at once.
 
 For the second repo and every repo after it, `/lc:plan` replaces `/lc:init` — see
 [Install](#install).
