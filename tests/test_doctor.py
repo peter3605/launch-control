@@ -87,6 +87,36 @@ class BoardSchema(unittest.TestCase):
                 self.assertIn('configure it as `FILTER "Agent can do this" = FALSE; FILTER "Status" != "Done"', f[0])
                 self.assertIn("init.py views` prints every view's configure line", f[0])
 
+    def test_board_view_filtered_on_type_is_named_with_a_fix_that_clears_it(self):
+        """LC-B14, found on the live board: `board` filtered on Type silently drops
+        Backlog and Chore rows from /lc:done's dependents and /lc:plan's prefix check.
+        board.json gives it no filter, so the fix must clear one, not omit it."""
+        for saved in (False, True):
+            with self.subTest(saved=saved), tempfile.TemporaryDirectory() as tmp:
+                b = Board()
+                b.views[VIEW_IDS["board"]]["advancedFilter"]["filters"].append(
+                    leaf("Type", "is", "Launch Blocker", b.spec))
+                r = doctor(b, tmp, saved=saved)
+                self.assertEqual(r.returncode, 1, r.stdout)
+                f = fails(r)
+                self.assertEqual(len(f), 1, f)
+                self.assertTrue(f[0].startswith("views.board ('Board'): filter is"), f[0])
+                self.assertIn('fix: configure it as `CLEAR FILTER; GROUP BY "Status"', f[0])
+                self.assertIn("clear any it has", f[0])
+                self.assertIn("a line with no FILTER clause leaves an existing filter in place", f[0])
+
+    def test_a_filtered_view_fix_has_no_clear(self):
+        """A FILTER clause replaces the old filter, so a filtered view's fix needs no
+        CLEAR and must not claim the view should have none."""
+        with tempfile.TemporaryDirectory() as tmp:
+            b = Board()
+            b.views[VIEW_IDS["ready"]]["advancedFilter"]["filters"].pop()
+            r = doctor(b, tmp)
+        f = fails(r)
+        self.assertEqual(len(f), 1, f)
+        self.assertNotIn("CLEAR FILTER", f[0])
+        self.assertNotIn("clear any it has", f[0])
+
     def test_missing_property_is_named_with_its_fix(self):
         for saved in (False, True):
             with self.subTest(saved=saved), tempfile.TemporaryDirectory() as tmp:

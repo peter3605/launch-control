@@ -35,7 +35,7 @@ import sys
 sys.dont_write_bytecode = True  # importing boardcheck must not litter the installed plugin
 # boardcheck imports nothing from here or from init.py, so this is not a cycle even
 # though init.py imports this file.
-from boardcheck import (spec, unwrap_saved, hex_id, ds_uuid, configure, road_spec,  # noqa: E402
+from boardcheck import (spec, unwrap_saved, hex_id, ds_uuid, repair, road_spec,  # noqa: E402
                         parse_database, check_properties, check_view)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -231,7 +231,7 @@ def check_schema(cfg, stories_path, projects_path):
     for v in s["views"]:
         if config_views.get(v["key"]):
             check_view(v["key"], v, config_views[v["key"]], views, ok,
-                       lambda m, v=v: fail(f"{m} - fix: configure it as `{configure(v)}` "
+                       lambda m, v=v: fail(f"{m} - {repair(v)} "
                                            f"(`python3 {INIT_PY} views` prints every view's configure line)"))
     if not config_views.get("road"):
         return
@@ -243,7 +243,7 @@ def check_schema(cfg, stories_path, projects_path):
     url = f"https://www.notion.so/{page}"
     road = road_spec(key, url, s)
     check_view("road", road, config_views["road"], views, ok,
-               lambda m: fail(f"{m} - fix: configure it as `{configure(road)}` "
+               lambda m: fail(f"{m} - {repair(road)} "
                               f"(`python3 {INIT_PY} views --road --key {key} --project-url {url}` prints it)"))
 
 

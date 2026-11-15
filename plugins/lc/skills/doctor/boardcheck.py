@@ -57,8 +57,15 @@ def dsl_value(v):
 
 
 def configure(v):
-    """A board.json view as the view DSL's configure line."""
-    parts = []
+    """A board.json view as the view DSL's configure line.
+
+    A view with no filters starts with CLEAR FILTER. Through the Notion MCP's
+    update-view tool, a FILTER clause replaces a view's whole filter, but a line
+    with no FILTER clause leaves an existing filter in place - so without the
+    CLEAR, the repair for a view that should have no filter changes nothing.
+    create-view accepts the CLEAR on a new view. Verified on a throwaway board,
+    2026-11-15 (docs/troubleshooting.md)."""
+    parts = [] if v["filters"] else ["CLEAR FILTER"]
     for prop, op, value in v["filters"]:
         # For a relation, = means contains in the view DSL.
         parts.append(f'FILTER "{prop}" {"!=" if op == "is_not" else "="} {dsl_value(value)}')
@@ -69,6 +76,16 @@ def configure(v):
     if v.get("show"):
         parts.append("SHOW " + ", ".join(f'"{p}"' for p in v["show"]))
     return "; ".join(parts)
+
+
+def repair(v):
+    """The fix a view FAIL names: its configure line, plus, for a view that should
+    have no filter, the instruction to remove the one it has."""
+    line = f"fix: configure it as `{configure(v)}`"
+    if not v["filters"]:
+        line += (" - this view has no filter in board.json, so clear any it has: keep the CLEAR FILTER, "
+                 "because a line with no FILTER clause leaves an existing filter in place")
+    return line
 
 
 def road_spec(key, project_url, s=None):

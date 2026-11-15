@@ -17,6 +17,19 @@ enforces it; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
+## 0.9.1 — 2026-11-15
+
+**A view's repair line now removes a filter the view should not have.** (LC-B14)
+
+- **The `configure` line for a view with no filters starts with `CLEAR FILTER`.**
+  Through the Notion MCP's update-view tool, a line with no `FILTER` clause leaves an
+  existing filter in place. So the fix `/lc:doctor` named for the shared `board` view
+  filtering on `Type`, the case that turned up on a live board, changed nothing.
+  Checked on a throwaway board; the details are in `docs/troubleshooting.md`.
+- **The FAIL says so too.** For such a view, `/lc:doctor` and `init.py check` both
+  say to clear any filter it has. `init.py check`'s view FAILs now name the fix too,
+  as `/lc:doctor`'s already did.
+
 ## 0.9.0 — 2026-11-15
 
 **No command spends the free plan's metered query allowance.** (LC-25)
