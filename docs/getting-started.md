@@ -25,8 +25,11 @@ missing:
 - **Claude Code.**
 - **`python3`**, by that name, on `PATH`.
 - **`git`**.
-- **A Notion account.** The free plan is enough — every command queries views in
-  view mode, which is unmetered. Nothing here uses billed SQL mode.
+- **A Notion account.** The free plan is enough. Every board read is a saved view
+  queried in view mode, or a `fetch` of one page. On the free plan, SQL and
+  rows-mode queries share one metered workspace allowance and view mode has no
+  quota ([Notion's MCP database tools reference](https://developers.notion.com/guides/mcp/tools-databases-reference), checked 2026-11-15), so nothing
+  here makes a SQL or rows-mode query.
 - **`gh`, authenticated** — only if you want `/lc:done` to open pull requests. The
   board works fine without it.
 - **A Notion page** to put the board under. An empty one is ideal. Everything

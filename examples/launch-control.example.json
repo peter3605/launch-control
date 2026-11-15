@@ -20,7 +20,7 @@
     "board": "https://www.notion.so/<db>?v=<view id>",
     "road": "https://www.notion.so/<db>?v=<view id>"
   },
-  "note": "Prefer querying data sources in VIEW mode - it is unmetered on the free Notion plan. SQL mode is billed.",
+  "note": "Read the board in VIEW mode only - it has no quota on the free Notion plan. SQL and rows mode share one metered workspace allowance.",
   "dependencies": "'Blocked by' is a RELATION (pass page URLs, not story IDs). 'Blocked by IDs' and 'Blocker status' are rollups - they render in Notion's UI but return opaque handles to the API, so resolve blockers by fetching the linked pages. Status=Ready already means unblocked.",
   "viewContract": "Every project has its own 'road' view, filtered to that project and nothing else. Commands MUST scope by views.road - never by a shared browse view, whose filters anyone can change in the Notion UI.",
   "git": {
