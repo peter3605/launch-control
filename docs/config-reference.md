@@ -9,7 +9,7 @@ differences live.
 |---|---|
 | `project` | Project key, matching the row in the Projects database |
 | `prefix` | Story-ID prefix, e.g. `APP` — every command filters on it |
-| `projectPageId` | The Projects-database row for this repo, used by `/lc:groom` |
+| `projectPageId` | The Projects-database row for this repo, used by `/lc:groom`, and by `/lc:doctor` to check the road view filters on it |
 
 ## Board
 
@@ -24,8 +24,9 @@ rather than filters composed at call time.
 Every one of these can break without anything erroring. Run `/lc:doctor` after
 editing this file by hand: it fails on a missing view key, a view URL that does not
 resolve or points at another database, a `road` view that is empty or returns
-another project's stories, a Story ID on two rows, and a `baseBranch` that is not
-the remote's default branch.
+another project's stories, a Story ID on two rows, a `baseBranch` that is not
+the remote's default branch, and a board whose properties or view filters no
+longer match the plugin's `board.json`.
 
 ## `git`
 

@@ -428,7 +428,7 @@ properties that carry weight, and the views each command reads.
 | `/lc:status` | Where every project stands |
 | `/lc:groom <what>` | Files something newly discovered, with real acceptance criteria |
 | `/lc:reconcile` | Audits the board against the repo; evidence required to close anything |
-| `/lc:doctor [repo]` | Checks the config hasn't quietly broken: view keys, road scoping, base branch, duplicate IDs, notices naming finished stories. Exits non-zero on any |
+| `/lc:doctor [repo]` | Checks the config hasn't quietly broken: view keys, road scoping, base branch, duplicate IDs, notices naming finished stories, and a board schema or view filter that no longer matches `board.json`. Exits non-zero on any |
 
 Two hooks do the rest: `SessionStart` tells a session which story it is bound to
 and reads out that repo's standing warnings; `Stop` refuses a silent exit while a
@@ -513,7 +513,7 @@ opening a PR. See [`docs/config-reference.md`](docs/config-reference.md).
 
 ## Status
 
-v0.7.0: pre-1.0, extracted from a working setup that manages five projects. The
+v0.8.0: pre-1.0, extracted from a working setup that manages five projects. The
 board is provisioned by `/lc:init`; projects on it are provisioned by `/lc:plan`.
 
 What this is *not* is a tracker for the steps inside a story. Keep those wherever

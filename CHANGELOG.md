@@ -17,6 +17,32 @@ enforces it; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
+## 0.8.0 — 2026-11-15
+
+**`/lc:doctor` catches a board whose schema predates the plugin.** (LC-B12)
+
+- **A full `/lc:doctor` run now compares the board with `board.json`**: every
+  Stories and Projects property (present, right type, every select option, each
+  relation pointing at the configured data source) and every view in the config
+  (filter, sort, grouping, type; the road view against `projectPageId`). When
+  `board.json` changes, existing boards do not, and until now that surfaced as a
+  command misbehaving rather than as a named failure. The best-known case is a
+  `yourTurn` view still filtering on `Type`.
+- **Each failure carries its fix**: the view's `configure` line (what
+  `init.py views` prints), or the `init.py ddl` command that prints a property's
+  definition. Doctor reports; it does not change the board.
+- **The session fetches the Stories and Projects databases once each** and passes
+  them to `doctor.py` as `--stories` and `--projects`. A full run without them is a
+  FAIL, not a pass. `--local-only` skips the comparison.
+- **One comparison, two callers.** `init.py check`'s comparison moved into
+  `plugins/lc/skills/doctor/boardcheck.py`, which both scripts import and which
+  imports neither, so there is no import cycle. `unwrap_saved` moved with it.
+- Added `tests/test_doctor.py` on `test_init.py`'s fixtures. The mutation guard's
+  board mutations now target `boardcheck.py` and must be caught by both
+  `test_init` and `test_doctor`, plus one mutation that skips doctor's comparison.
+
+---
+
 ## 0.7.0 — 2026-11-14
 
 **An iOS release kit: the release as one checked command.** (LC-20)

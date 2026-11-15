@@ -215,6 +215,7 @@ class Ddl(unittest.TestCase):
             for skill in ("init", "doctor"):
                 os.makedirs(os.path.join(tmp, skill))
                 shutil.copy(os.path.join(SKILLS, skill, f"{skill}.py"), os.path.join(tmp, skill))
+            shutil.copy(os.path.join(SKILLS, "doctor", "boardcheck.py"), os.path.join(tmp, "doctor"))
             b = load_board()
             b["projects"]["properties"].append({"name": "Fixture owner", "type": "text", "description": "added by a test"})
             b["stories"]["properties"].append({"name": "Fixture risk", "type": "select", "options": [["Low", "green"], ["High", "red"]]})

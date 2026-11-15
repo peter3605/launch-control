@@ -264,6 +264,29 @@ is blunt.
 | `views.road returned Story IDs outside PREFIX-` | The road view is not filtered to this project. It is meant to show one project alone; a shared browse view must never be substituted for it. |
 | `Story ID on more than one row` | Two stories carry the same ID. Every command that looks a story up by ID will now find the wrong one roughly half the time. Fix it on the board. |
 
+### Board schema against board.json
+
+When the plugin's `board.json` changes, a board that is already provisioned does
+not change with it. These checks compare the board this repo is on with
+`plugins/lc/skills/init/board.json`, with the same code `/lc:init` uses to verify a
+board it has just built. The session fetches the Stories and Projects databases
+once each for them. Doctor reports these and never changes the board: what to do
+about a schema difference is your call.
+
+| It says | What it means |
+|---|---|
+| `Stories: property 'X' is missing - fix it on the board ...` (or `Projects:`) | The board has no property of that name, or it was renamed. Commands that read or write it will fail or quietly skip it. Add it in Notion with the type and options in `board.json`; the `init.py ddl` command named in the message prints every property's definition. |
+| `Stories: 'X' is 'text', not 'select'` | The property exists with a different type. Notion cannot convert every type cleanly, so check the existing values before you change it. |
+| `Stories: 'X' is missing options A, B` | A select is missing options that `board.json` (and the commands) use. For `Status` this means `/lc:done` or `/lc:start` would set a value that does not exist. Add the options, or rename the ones that were renamed. |
+| `Stories: 'X' relates to '...', not projects` | A relation points at a different data source from the one in the config. Usually a board copied or duplicated in Notion, where the relation still points at the original. |
+| `views.X ('Name'): filter is [...], not [...] - fix: configure it as ...` | The view filters on something `board.json` does not, or misses something it does. The best-known case is `yourTurn` still filtering on `Type`, on boards built before that filter was dropped: human work typed anything but Launch Blocker is hidden from `/lc:mine`. Set the view's filter to the `configure` line in the message; `init.py views` prints every view's line. Do not retype stories to suit an old filter. |
+| `views.X ('Name'): sort is [...], not [...]` / `not grouped by 'Status'` / `type is ...` | Same fix, the same `configure` line. A view out of `Seq` order makes `/lc:next` pick the wrong story. |
+| `views.X: ... is not a view of the Stories database` | The view in the config does not appear in the database fetch. It was deleted, or it belongs to another database. |
+| `views.road ...: filter is ...` | The road view is not filtered to this project's row (`projectPageId`). The message carries the `init.py views --road` command that prints its `configure` line. |
+| `skip views.road filter - no projectPageId in the config` | There is no `projectPageId` to compare the road's filter with. Not a failure; the road's prefix check above still runs. |
+| `stories: ... is data source X, but stories.dataSource is Y` | The fetch is of a different database from the one the config names. Re-run `/lc:doctor`, fetching `stories.database` and `projects.database` from this repo's config. |
+| `board schema was not checked - pass --stories and --projects` | The session ran a full check without the two database fetches. Re-run `/lc:doctor`. |
+
 ### Git
 
 | It says | What it means |

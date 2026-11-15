@@ -33,7 +33,8 @@ What the suite covers today:
 | `tests/test_mine.py` | `/lc:mine`'s lead-time arithmetic — the computation this product is sold on |
 | `tests/test_init.py` | `init.py`: the DDL and views generated from `board.json`, `preflight`'s refusal to build a second board, and `check` failing on a missing property, a lost select option or a wrongly filtered view - against fetch results in both the inline and saved-to-file shapes |
 | `tests/test_plan.py` | `plan.py`: `lint`'s refusals, `next-id`'s use of the run's ledger and its exit 2 on a lost ID race, `payload`'s Ready/Backlog, `order`, `verify`, and `config` refusing to overwrite another project |
-| `tests/test_mutation_guard.py` | That `test_mine.py`, `test_init.py` and `test_plan.py` would actually go red if what they pin broke. A mutation that slips through fails here |
+| `tests/test_doctor.py` | `doctor.py`'s comparison of an existing board with `board.json`: a `yourTurn` view still filtering on Type, a missing property, a lost option, a wrong sort and a mis-scoped road each fail with their fix, and a matching board passes - on `test_init.py`'s fixtures |
+| `tests/test_mutation_guard.py` | That `test_mine.py`, `test_init.py`, `test_plan.py` and `test_doctor.py` would actually go red if what they pin broke. A mutation that slips through fails here |
 | `tests/test_version_sync.py` | The version check, demonstrated failing and passing |
 | `tests/test_setup.py` | `setup.sh` parses under bash 3.2, and its dry run writes nothing |
 
