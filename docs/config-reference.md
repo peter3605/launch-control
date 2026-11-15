@@ -17,9 +17,14 @@ differences live.
 (`collection://...`). `views` carries seven named view URLs — see
 [notion-schema.md](notion-schema.md) for what each view must filter on.
 
-Query views in **view mode**, not SQL mode: view mode is unmetered on Notion's
-free plan and SQL mode is billed. This is why the views are durable named objects
-rather than filters composed at call time.
+Query views in **view mode**, never SQL or rows mode. On Notion's free plan, SQL
+and rows-mode queries draw on one metered workspace allowance, and view mode has
+no quota ([Notion's MCP database tools reference](https://developers.notion.com/guides/mcp/tools-databases-reference), checked 2026-11-15). This is why the
+views are durable named objects rather than filters composed at call time, and
+why the filtering a query would do happens in `ids.py` over saved view pages
+instead (`views.road` for this project's IDs, `views.board` for anything
+board-wide: dependents in other projects, whether a prefix is free). Keep
+`views.board` unfiltered; `/lc:doctor` fails it if it is not.
 
 Every one of these can break without anything erroring. Run `/lc:doctor` after
 editing this file by hand: it fails on a missing view key, a view URL that does not

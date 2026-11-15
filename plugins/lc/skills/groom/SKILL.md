@@ -8,16 +8,18 @@ File **$ARGUMENTS** into the Launch Control backlog.
 
 1. Read `.claude/launch-control.json` for the project page ID, the stories data source, and the story-ID prefix.
 2. Decide whether this is a **Launch Blocker** (users cannot be served without it), **Backlog** (better product, does not block shipping), or a **Chore**. Say which and why, in one line.
-3. Search the Stories database first. If something equivalent exists, update that story rather than creating a duplicate.
+3. Search the Stories database first - with `notion-search`, not a data-source query. If something equivalent exists, update that story rather than creating a duplicate.
 4. **Allocate the Story ID by re-read-and-retry.** This is the chosen method, and it is a loop rather than a lookup — read it as one. Launch blockers take plain numbers (`ABC-22`); backlog items take the `-B` series (`ABC-B12`), and the two are separate sequences, so scan only the one you are allocating from.
 
-   a. Query the Stories data source for every row whose **Story ID** starts with this prefix. Take the highest number in your sequence, add one: that is the candidate.
+   Every read in this loop is the project's **road view** (`views.road`) in **view mode**, paged with `start_cursor` until `has_more` is false, keeping each page's result file (a large result is saved to a file for you; write an inline one to your scratchpad). The road view covers the whole sequence because a prefix belongs to exactly one project. Hand the pages to `<base directory>/../doctor/ids.py` rather than reading rows by eye - a road view runs to hundreds of thousands of characters. Never use a rows-mode or SQL query: Notion's free plan meters both from one workspace allowance, and a groom makes several reads.
+
+   a. `python3 <base directory>/../doctor/ids.py next <page files...> --prefix <PREFIX>` (add `--backlog` for the `-B` series) prints the highest number in your sequence plus one: that is the candidate. It refuses to answer from a read that stopped before the last page.
 
    b. **Re-read the board immediately before the create in step 5** — not before you drafted the page, not a paragraph earlier. The window between reading the highest number and writing the new row is the entire bug, so make that window as small as you can: the re-read is the last thing you do before creating the page.
 
    c. If the candidate is taken by the time you re-read, take the new highest, add one, and **retry from (b)**. Repeat until the create succeeds or five candidates in a row come back taken; if five are taken, stop and say so rather than forcing a number through.
 
-   d. After the create, read the row back and confirm its Story ID appears exactly once across the prefix. If it appears twice you lost the race — renumber the row you just created. Do not delete it, and do not renumber the other one; the other session is still using it.
+   d. After the create, re-read the road view and run `ids.py find <page files...> --id <new ID>`: exit 0 means its Story ID appears exactly once across the prefix, exit 2 means twice. A brand-new row can lag the view by a few seconds; if it is not found yet, re-read once or twice before worrying. If it appears twice you lost the race — renumber the row you just created. Do not delete it, and do not renumber the other one; the other session is still using it.
 
    Why this rather than just taking the next free number: two sessions grooming the same prefix at once both read the same highest number and both write it. That is not theoretical — it happened three times in a single day during development, and once to the very story filed to fix it. IDs are per-prefix, so the race is per-prefix: you collide only with another session grooming this same project.
 

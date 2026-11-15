@@ -17,6 +17,31 @@ enforces it; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
+## 0.9.0 — 2026-11-15
+
+**No command spends the free plan's metered query allowance.** (LC-25)
+
+- **Every board read is now a saved view in view mode, or a `fetch` of one page.**
+  On Notion's free plan, SQL and rows-mode queries share one metered workspace
+  allowance and view mode has no quota ([Notion's MCP database tools
+  reference](https://developers.notion.com/guides/mcp/tools-databases-reference),
+  checked 2026-11-15). The old README claim that nothing here was metered was true
+  of SQL and false of rows mode: five steps used it, and one ran on every story
+  close. A grooming session hit `usage_limit_reached` on 2026-11-14.
+- **New `ids.py`** (beside `doctor.py`) does the filtering those queries did, over
+  saved view pages: `find` a story by ID, the `next` free ID in a sequence, the
+  `dependents` of a page, and whether a prefix is free. It refuses to answer from a
+  view that was not read to the last page, and matches page URLs by id, so an
+  `app.notion.com/p/...` link and a `notion.so/...-Title-<id>` link compare equal.
+- **Rewritten:** `/lc:start` step 2 and `/lc:groom` step 4 read `views.road`;
+  `/lc:done` step 18 and `/lc:reconcile` step 6 read `views.board`, because a
+  dependent can live in another project; `/lc:plan` step 6 reads `views.board` for
+  the prefix and `notion-search` plus `fetch` for the key.
+- **`views.board` must stay unfiltered** now that it answers board-wide questions.
+  `/lc:doctor` already fails it if it is filtered.
+
+---
+
 ## 0.8.0 — 2026-11-15
 
 **`/lc:doctor` catches a board whose schema predates the plugin.** (LC-B12)

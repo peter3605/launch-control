@@ -177,7 +177,7 @@ before the install commands below, not after.
 |---|---|---|
 | **macOS or Linux** (WSL counts as Linux) | Both hooks are bash scripts that call `python3`, and `setup.sh` and `migrate.sh` are bash. Native Windows is **untested and unsupported** — use WSL. Claude Code's docs say it runs command hooks through Git Bash on Windows, or PowerShell without it (checked 2026-11-15, [hooks reference](https://code.claude.com/docs/en/hooks)); whether these hooks then work there has not been tried | On native Windows the plugin installs and the hooks silently do nothing. `setup.sh` stops and names the platform |
 | **Claude Code** | The commands are Claude Code skills; the two hooks are Claude Code hooks | Nothing to install into |
-| **A Notion account** | The board *is* a Notion database. The free plan is enough — every command queries views in view mode, which is unmetered; nothing here uses billed SQL mode | No board |
+| **A Notion account** | The board *is* a Notion database. The free plan is enough. Every board read is a saved view queried in view mode, or a `fetch` of one page; nothing makes a SQL or rows-mode query. On the free plan SQL and rows-mode queries share one metered workspace allowance and view mode has no quota ([Notion's MCP database tools reference](https://developers.notion.com/guides/mcp/tools-databases-reference), checked 2026-11-15; a `usage_limit_reached` error naming both modes was hit on 2026-11-14) | No board |
 | **Notion connected as an MCP connector in Claude Code** | Every single command reads or writes the board through Notion's MCP tools. There is no local or offline mode | `/lc:init` stops at pre-flight and names this |
 | **That connector authorised on the page the board lives under** | Notion connectors see only the pages you share with them. Connected-but-unshared fails the same way as not connected | `/lc:init` stops at pre-flight and names this |
 | **`python3` on `PATH`** | Every skill shells out to it; so do both hooks, `setup.sh` and `migrate.sh` | `setup.sh` stops and names it; `migrate.sh` stops at step 0. Hooks fail quietly |
@@ -513,7 +513,7 @@ opening a PR. See [`docs/config-reference.md`](docs/config-reference.md).
 
 ## Status
 
-v0.8.0: pre-1.0, extracted from a working setup that manages five projects. The
+v0.9.0: pre-1.0, extracted from a working setup that manages five projects. The
 board is provisioned by `/lc:init`; projects on it are provisioned by `/lc:plan`.
 
 What this is *not* is a tracker for the steps inside a story. Keep those wherever

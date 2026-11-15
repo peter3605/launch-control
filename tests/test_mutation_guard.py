@@ -11,6 +11,8 @@ LC-23 extended it past mine.py: init.py check's comparison with board.json and
 plan.py next-id's ledger lookup are guarded the same way, by test_init and test_plan.
 LC-B12 moved that comparison into boardcheck.py, shared with doctor.py, so its
 mutations now target boardcheck.py and must be caught by BOTH callers' suites.
+LC-25 added ids.py, which now does the filtering metered queries used to, so its
+dependents match, its next-ID arithmetic and its has_more refusal are guarded too.
 
 Each mutation is a single-token edit to a real computation. If you change mine.py
 and a mutation stops applying, the guard fails loudly rather than skipping - a
@@ -28,6 +30,7 @@ MINE = os.path.join("plugins", "lc", "skills", "mine", "mine.py")
 BOARDCHECK = os.path.join("plugins", "lc", "skills", "doctor", "boardcheck.py")
 DOCTOR = os.path.join("plugins", "lc", "skills", "doctor", "doctor.py")
 PLAN = os.path.join("plugins", "lc", "skills", "plan", "plan.py")
+IDS = os.path.join("plugins", "lc", "skills", "doctor", "ids.py")
 
 # (name, exact source to replace, replacement, what it breaks)
 MUTATIONS = [
@@ -138,6 +141,30 @@ BOARD_MUTATIONS = [
         "a blocked story would be offered by /lc:next before its blocker is done",
         "tests.test_plan",
     ),
+    (
+        "ids_dependents_stops_matching_page_ids",
+        IDS,
+        "if target in {page_id(u) for u in r[\"blockedBy\"]}:",
+        "if args.url in r[\"blockedBy\"]:",
+        "a dependent linked by another URL form would never be promoted to Ready",
+        "tests.test_ids",
+    ),
+    (
+        "ids_next_ignores_the_highest_number",
+        IDS,
+        "n = max(nums, default=0) + 1",
+        "n = len(nums) + 1",
+        "a gap in the sequence would hand out an ID that is already taken",
+        "tests.test_ids",
+    ),
+    (
+        "ids_answers_from_an_incomplete_read",
+        IDS,
+        "        complete = not data.get(\"has_more\")\n",
+        "        complete = True\n",
+        "an ID on an unread page would be handed out again, and its dependents missed",
+        "tests.test_ids",
+    ),
 ]
 
 
@@ -183,7 +210,7 @@ class MutationGuard(unittest.TestCase):
     def test_the_unmutated_tree_passes_init_plan_and_doctor(self):
         with tempfile.TemporaryDirectory() as tmp:
             build_tree(tmp)
-            for module in ("tests.test_init", "tests.test_plan", "tests.test_doctor"):
+            for module in ("tests.test_init", "tests.test_plan", "tests.test_doctor", "tests.test_ids"):
                 r = run_suite(tmp, module)
                 self.assertEqual(r.returncode, 0,
                                  f"{module} must pass on the copied tree before mutations mean anything:\n{r.stderr}")
