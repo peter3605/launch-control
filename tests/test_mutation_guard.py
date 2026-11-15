@@ -1,4 +1,4 @@
-"""Proof that test_mine.py would notice if the arithmetic broke.
+"""Proof that the suite would notice if the computations it pins broke.
 
 A test suite that passes is not evidence of anything on its own - assertions rot
 into tautologies, and a suite can go green against code that computes nonsense.
@@ -7,6 +7,8 @@ for every break. A mutation that slips through is a failure HERE, which means th
 gap shows up as a red build rather than as a number nobody checked.
 
 This is what satisfies LC-B8's "a deliberately broken computation fails the build".
+LC-23 extended it past mine.py: init.py check's comparison with board.json and
+plan.py next-id's ledger lookup are guarded the same way, by test_init and test_plan.
 
 Each mutation is a single-token edit to a real computation. If you change mine.py
 and a mutation stops applying, the guard fails loudly rather than skipping - a
@@ -21,6 +23,8 @@ import unittest
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MINE = os.path.join("plugins", "lc", "skills", "mine", "mine.py")
+INIT = os.path.join("plugins", "lc", "skills", "init", "init.py")
+PLAN = os.path.join("plugins", "lc", "skills", "plan", "plan.py")
 
 # (name, exact source to replace, replacement, what it breaks)
 MUTATIONS = [
@@ -73,7 +77,60 @@ MUTATIONS = [
 ]
 
 
-def build_tree(dest, mutate=None):
+# (name, file, exact source to replace, replacement, what it breaks, suite that must catch it)
+BOARD_MUTATIONS = [
+    (
+        "init_check_compares_only_the_number_of_view_filters",
+        INIT,
+        "if have != [tuple(e) for e in expect]:",
+        "if len(have) != len(expect):",
+        "a view filtered on the wrong value would pass as provisioned",
+        "tests.test_init",
+    ),
+    (
+        "init_check_ignores_missing_select_options",
+        INIT,
+        'lost = [n for n, _ in p["options"] if n not in names]',
+        "lost = []",
+        "a Status select without In Review would pass, and /lc:done would set an option that does not exist",
+        "tests.test_init",
+    ),
+    (
+        "init_check_ignores_view_sorts",
+        INIT,
+        "if sorts != want_sorts:",
+        "if False:",
+        "a view sorted wrongly would pass, and /lc:next would pick out of Seq order",
+        "tests.test_init",
+    ),
+    (
+        "plan_next_id_ignores_the_ledger",
+        PLAN,
+        'taken = ids + [v["id"] for v in state.values()]',
+        "taken = ids",
+        "a story filed a second ago and not yet in the view would have its ID handed out again",
+        "tests.test_plan",
+    ),
+    (
+        "plan_next_id_misses_a_duplicate_it_filed",
+        PLAN,
+        'dupes = [(d, v["id"]) for d, v in state.items() if ids.count(v["id"]) > 1]',
+        'dupes = [(d, v["id"]) for d, v in state.items() if ids.count(v["id"]) > 2]',
+        "an ID this run filed that lost a race would stay on two rows",
+        "tests.test_plan",
+    ),
+    (
+        "plan_payload_files_blocked_stories_as_ready",
+        PLAN,
+        '"Status": "Backlog" if blockers else "Ready",',
+        '"Status": "Ready",',
+        "a blocked story would be offered by /lc:next before its blocker is done",
+        "tests.test_plan",
+    ),
+]
+
+
+def build_tree(dest, mutate=None, target=MINE):
     """A runnable copy of the tree: the plugin scripts, this suite, and the
     examples test_mine runs against (LC-B11's sample board)."""
     for sub in ("plugins", "tests", "examples"):
@@ -83,22 +140,22 @@ def build_tree(dest, mutate=None):
         )
     if mutate:
         old, new = mutate
-        path = os.path.join(dest, MINE)
+        path = os.path.join(dest, target)
         with open(path) as f:
             src = f.read()
         if src.count(old) != 1:
             raise AssertionError(
-                f"mutation target appears {src.count(old)} times in {MINE}, expected exactly 1. "
-                "mine.py changed - update the mutation so it keeps testing something."
+                f"mutation target appears {src.count(old)} times in {target}, expected exactly 1. "
+                f"{os.path.basename(target)} changed - update the mutation so it keeps testing something."
             )
         with open(path, "w") as f:
             f.write(src.replace(old, new))
 
 
-def run_suite(cwd):
-    """test_mine only - discovery would re-run this guard inside itself."""
+def run_suite(cwd, module="tests.test_mine"):
+    """One suite only - discovery would re-run this guard inside itself."""
     return subprocess.run(
-        [sys.executable, "-B", "-m", "unittest", "tests.test_mine"],
+        [sys.executable, "-B", "-m", "unittest", module],
         cwd=cwd, capture_output=True, text=True, timeout=120,
     )
 
@@ -111,6 +168,14 @@ class MutationGuard(unittest.TestCase):
             r = run_suite(tmp)
         self.assertEqual(r.returncode, 0,
                          f"the copied tree must pass before mutations mean anything:\n{r.stderr}")
+
+    def test_the_unmutated_tree_passes_init_and_plan(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            build_tree(tmp)
+            for module in ("tests.test_init", "tests.test_plan"):
+                r = run_suite(tmp, module)
+                self.assertEqual(r.returncode, 0,
+                                 f"{module} must pass on the copied tree before mutations mean anything:\n{r.stderr}")
 
 
 def _make(name, old, new, why):
@@ -128,8 +193,25 @@ def _make(name, old, new, why):
     return test
 
 
+def _make_board(name, target, old, new, why, module):
+    def test(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            build_tree(tmp, mutate=(old, new), target=target)
+            r = run_suite(tmp, module)
+        self.assertNotEqual(
+            r.returncode, 0,
+            f"mutation '{name}' survived: {why}, and {module} still passed.\n"
+            f"Add or tighten an assertion in {module.replace('.', '/')}.py until this breaks it.",
+        )
+    test.__name__ = f"test_caught_{name}"
+    test.__doc__ = f"Breaking it means: {why}."
+    return test
+
+
 for _n, _o, _w, _y in MUTATIONS:
     setattr(MutationGuard, f"test_caught_{_n}", _make(_n, _o, _w, _y))
+for _n, _t, _o, _w, _y, _m in BOARD_MUTATIONS:
+    setattr(MutationGuard, f"test_caught_{_n}", _make_board(_n, _t, _o, _w, _y, _m))
 
 
 if __name__ == "__main__":
