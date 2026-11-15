@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>method</key>
+	<string>app-store-connect</string>
+	<!-- export, not upload: archive.sh checks the .ipa before anything leaves
+	     the machine, and Transporter uploads that exact file. -->
+	<key>destination</key>
+	<string>export</string>
+	<!-- Your 10-character Apple Developer team ID. check-release-ready.sh
+	     fails until this is filled in. -->
+	<key>teamID</key>
+	<string>REPLACE_ME</string>
+	<key>signingStyle</key>
+	<string>automatic</string>
+	<key>uploadSymbols</key>
+	<true/>
+	<!-- archive.sh owns the build number, in VERSION_FILE. Left on, the
+	     export would rewrite it and the app would ship a number nothing records. -->
+	<key>manageAppVersionAndBuildNumber</key>
+	<false/>
+</dict>
+</plist>

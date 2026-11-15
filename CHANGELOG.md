@@ -17,6 +17,35 @@ enforces it; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
+## 0.7.0 — 2026-11-14
+
+**An iOS release kit: the release as one checked command.** (LC-20)
+
+- **Added `plugins/lc/kits/ios-release/`**, generalised from the scripts one iOS
+  app shipped 1.0 with and then hardened after. `archive.sh` bumps the build
+  number, archives Release, exports, and checks the exported `.ipa` (build number
+  in every bundle, required entitlements per bundle, secrets in the build tree),
+  restoring the build number on any failure. `check-release-ready.sh` runs every
+  check that needs no signing identity and reports all failures, not the first:
+  the version file, `ExportOptions.plist`, `ITSAppUsesNonExemptEncryption`, the
+  privacy manifest, the entitlements the project asks for, store copy against
+  App Store Connect's limits, un-redacted log lines, and the build tree.
+- **Everything app-specific is in `release.conf`.** Project directory and
+  generate step (XcodeGen), scheme, bundles, required entitlements, log source
+  directories and their allowlist, store copy fields. `install.sh` copies the
+  scripts on every run and writes `release.conf`, `ExportOptions.plist` and
+  `docs/store-copy.md` only when absent. Dry run by default.
+- **Added `templates/stories.json`**: ten release stories in `/lc:plan`'s
+  proposal format, each with `appliesWhen`, carrying the traps that cost real
+  time - Transporter rather than Organizer, a new build number per upload, What's
+  New absent at 1.0, the screenshot sizes, App Review sign-in for apps with
+  accounts, Sign in with Apple under 4.8, a Sandbox-only APNs key, phased release
+  for migrations. They pass `plan.py lint`.
+- **Plists with `--` inside a comment are read the way Xcode reads them.** Found
+  on the first real install: Apple's parser accepts it, Python's does not.
+- Tested without a Mac in `tests/test_ios_release_kit.py`, including the shell
+  scripts against a synthetic app repo.
+
 ## 0.6.0 — 2026-09-21
 
 **A front door for someone who has never seen this repo.** (LC-17)
