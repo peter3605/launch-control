@@ -245,6 +245,16 @@ class Views(unittest.TestCase):
         self.assertIn('GROUP BY "Status"', by["board"]["configure"])
         self.assertEqual(by["board"]["type"], "board")
 
+    def test_a_view_with_no_filters_clears_any_it_has(self):
+        """A configure line with no FILTER clause leaves an existing filter in place
+        (verified on a throwaway board, LC-B14), so a view board.json gives no filter
+        must say CLEAR FILTER - and only such a view, since a FILTER clause replaces."""
+        by = {v["key"]: v for v in json.loads(run(INIT, "views").stdout)}
+        self.assertTrue(by["board"]["configure"].startswith("CLEAR FILTER; "), by["board"]["configure"])
+        for k in SHARED:
+            if k != "board":
+                self.assertNotIn("CLEAR FILTER", by[k]["configure"], k)
+
     def test_road_view_filters_on_this_project(self):
         r = run(INIT, "views", "--road", "--key", "my-app", "--project-url", PROJECT_PAGE)
         self.assertEqual(r.returncode, 0, r.stderr)
@@ -315,6 +325,23 @@ class Check(unittest.TestCase):
                 f = fails(r)
                 self.assertEqual(len(f), 1, f)
                 self.assertTrue(f[0].startswith("views.ready ('Ready for Claude Code'): filter is"), f[0])
+
+    def test_board_view_filtered_on_type_is_named_with_a_fix_that_clears_it(self):
+        """LC-B14: the live board's shared `board` view filtered on Type, though
+        board.json gives it none. The fix must remove that filter, not reprint a line
+        that leaves it in place."""
+        b = Board()
+        b.views[VIEW_IDS["board"]]["advancedFilter"]["filters"].append(
+            leaf("Type", "is", "Launch Blocker", b.spec))
+        with tempfile.TemporaryDirectory() as tmp:
+            r = b.check(tmp)
+        self.assertEqual(r.returncode, 1, r.stdout)
+        f = fails(r)
+        self.assertEqual(len(f), 1, f)
+        self.assertTrue(f[0].startswith("views.board ('Board'): filter is"), f[0])
+        self.assertIn('fix: configure it as `CLEAR FILTER; GROUP BY "Status"', f[0])
+        self.assertIn("clear any it has", f[0])
+        self.assertIn("a line with no FILTER clause leaves an existing filter in place", f[0])
 
     def test_view_with_a_dropped_filter_is_named(self):
         """A missing leaf is as wrong as a changed one: yourTurn without its Done filter

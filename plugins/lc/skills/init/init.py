@@ -43,7 +43,7 @@ from doctor import load_json, git  # noqa: E402
 # The comparison with board.json is shared with doctor.py, which holds an existing
 # board to the same contract. It lives in its own module so neither script imports
 # the other for it.
-from boardcheck import (spec, hex_id, view_id, ds_uuid, configure, road_spec,  # noqa: E402
+from boardcheck import (spec, hex_id, view_id, ds_uuid, configure, repair, road_spec,  # noqa: E402
                         fetch_text, parse_views, parse_database, check_properties, check_view)
 
 SHARED_VIEWS = ("ready", "inProgress", "inReview", "waitingExternal", "yourTurn", "board")
@@ -268,10 +268,13 @@ def cmd_check(args):
             if not recorded.get(v["key"]):
                 fail(f"views.{v['key']} was never created")
                 continue
-            check_view(v["key"], v, recorded[v["key"]], views, ok, fail)
+            check_view(v["key"], v, recorded[v["key"]], views, ok,
+                       lambda m, v=v: fail(f"{m} - {repair(v)} (`init.py views` prints every view's configure line)"))
         if state.get("road"):
             # The name is not checked, only the filter, so the key does not matter here.
-            check_view("road", road_spec("", state.get("project", ""), s), state["road"], views, ok, fail)
+            road = road_spec("", state.get("project", ""), s)
+            check_view("road", road, state["road"], views, ok,
+                       lambda m: fail(f"{m} - {repair(road)} (`init.py views --road` prints it)"))
         elif state.get("project"):
             fail("the project row exists but its road view was never created")
     return finish()

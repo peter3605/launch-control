@@ -279,13 +279,33 @@ about a schema difference is your call.
 | `Stories: 'X' is 'text', not 'select'` | The property exists with a different type. Notion cannot convert every type cleanly, so check the existing values before you change it. |
 | `Stories: 'X' is missing options A, B` | A select is missing options that `board.json` (and the commands) use. For `Status` this means `/lc:done` or `/lc:start` would set a value that does not exist. Add the options, or rename the ones that were renamed. |
 | `Stories: 'X' relates to '...', not projects` | A relation points at a different data source from the one in the config. Usually a board copied or duplicated in Notion, where the relation still points at the original. |
-| `views.X ('Name'): filter is [...], not [...] - fix: configure it as ...` | The view filters on something `board.json` does not, or misses something it does. The best-known case is `yourTurn` still filtering on `Type`, on boards built before that filter was dropped: human work typed anything but Launch Blocker is hidden from `/lc:mine`. Set the view's filter to the `configure` line in the message; `init.py views` prints every view's line. Do not retype stories to suit an old filter. A filter on `board` matters as much: since 0.9.0 `/lc:done`, `/lc:reconcile` and `/lc:plan` read it as the board-wide view (dependents in other projects, whether a prefix is free), so a filter there silently drops rows from those answers. If applying the `configure` line leaves an old filter in place, remove it by hand in the view's filter menu. |
+| `views.X ('Name'): filter is [...], not [...] - fix: configure it as ...` | The view filters on something `board.json` does not, or misses something it does. The best-known case is `yourTurn` still filtering on `Type`, on boards built before that filter was dropped: human work typed anything but Launch Blocker is hidden from `/lc:mine`. Set the view's filter to the `configure` line in the message; `init.py views` prints every view's line. Do not retype stories to suit an old filter. A filter on `board` matters as much: since 0.9.0 `/lc:done`, `/lc:reconcile` and `/lc:plan` read it as the board-wide view (dependents in other projects, whether a prefix is free), so a filter there silently drops rows from those answers. For `board`, which `board.json` gives no filter, the line starts with `CLEAR FILTER`, and the message says to clear any filter the view has: keep it, because a line with no `FILTER` clause leaves an existing filter in place (see [Repairing a view's filter](#repairing-a-views-filter)). |
 | `views.X ('Name'): sort is [...], not [...]` / `not grouped by 'Status'` / `type is ...` | Same fix, the same `configure` line. A view out of `Seq` order makes `/lc:next` pick the wrong story. |
 | `views.X: ... is not a view of the Stories database` | The view in the config does not appear in the database fetch. It was deleted, or it belongs to another database. |
 | `views.road ...: filter is ...` | The road view is not filtered to this project's row (`projectPageId`). The message carries the `init.py views --road` command that prints its `configure` line. |
 | `skip views.road filter - no projectPageId in the config` | There is no `projectPageId` to compare the road's filter with. Not a failure; the road's prefix check above still runs. |
 | `stories: ... is data source X, but stories.dataSource is Y` | The fetch is of a different database from the one the config names. Re-run `/lc:doctor`, fetching `stories.database` and `projects.database` from this repo's config. |
 | `board schema was not checked - pass --stories and --projects` | The session ran a full check without the two database fetches. Re-run `/lc:doctor`. |
+
+#### Repairing a view's filter
+
+How the Notion MCP's update-view tool treats a `configure` line, checked on a
+throwaway board on 2026-11-15 (LC-B14), never on a live one:
+
+- A line with **no** `FILTER` clause leaves the view's existing filter in place. A
+  board view filtered on `Type = Launch Blocker`, updated with `GROUP BY "Status";
+  SORT BY "Seq" ASC`, kept its Type filter.
+- `CLEAR FILTER` removes it. The same update with `CLEAR FILTER;` in front left the
+  view unfiltered, and a fetch of the view afterwards confirmed it.
+- A `FILTER` clause replaces the whole filter rather than adding to it, and `SORT BY`
+  replaces the sorts the same way. So a view `board.json` gives filters is repaired
+  by its `configure` line as printed.
+- create-view accepts `CLEAR FILTER` on a new view, so `/lc:init` creates `board`
+  from the same line.
+
+That is why the `configure` line for a view with no filters (today only `board`)
+starts with `CLEAR FILTER`. If you repair such a view in the Notion UI instead,
+remove the filter in its filter menu.
 
 ### Git
 
