@@ -155,6 +155,7 @@ before the install commands below, not after.
 
 | You need | Why | What happens without it |
 |---|---|---|
+| **macOS or Linux** (WSL counts as Linux) | Both hooks are bash scripts that call `python3`, and `setup.sh` and `migrate.sh` are bash. Native Windows is **untested and unsupported** — use WSL. Claude Code's docs say it runs command hooks through Git Bash on Windows, or PowerShell without it (checked 2026-11-15, [hooks reference](https://code.claude.com/docs/en/hooks)); whether these hooks then work there has not been tried | On native Windows the plugin installs and the hooks silently do nothing. `setup.sh` stops and names the platform |
 | **Claude Code** | The commands are Claude Code skills; the two hooks are Claude Code hooks | Nothing to install into |
 | **A Notion account** | The board *is* a Notion database. The free plan is enough — every command queries views in view mode, which is unmetered; nothing here uses billed SQL mode | No board |
 | **Notion connected as an MCP connector in Claude Code** | Every single command reads or writes the board through Notion's MCP tools. There is no local or offline mode | `/lc:init` stops at pre-flight and names this |

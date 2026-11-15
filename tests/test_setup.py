@@ -140,22 +140,29 @@ class Parses(unittest.TestCase):
         self.assertIn("/bin/bash", bashes())
 
 
-class DryRun(unittest.TestCase):
-    """The default mode, against a throwaway HOME that must stay empty."""
+class SetupRun(unittest.TestCase):
+    """Runs setup.sh in a sandbox. Holds no tests of its own."""
 
-    def run_setup(self, stub_claude, args=()):
+    def run_setup(self, stub_claude, args=(), extra_stubs=None):
         """setup.sh with stubbed `claude`/`gh` and an empty HOME.
+
+        `extra_stubs` maps a command name to a stub script, put on PATH ahead
+        of the real one (the platform test fakes `uname` this way). A stub may
+        say `@WORK@` for the throwaway directory, to leave evidence outside HOME.
 
         Returns (returncode, output, paths written into HOME).
         """
         work = tempfile.mkdtemp(prefix="lc-setup-")
         self.addCleanup(shutil.rmtree, work, True)
+        self.work = work
         home = os.path.join(work, "home")
         binned = os.path.join(work, "bin")
         os.makedirs(home)
         os.makedirs(binned)
-        write_exe(os.path.join(binned, "claude"), stub_claude)
+        write_exe(os.path.join(binned, "claude"), stub_claude.replace("@WORK@", work))
         write_exe(os.path.join(binned, "gh"), STUB_GH)
+        for name, text in (extra_stubs or {}).items():
+            write_exe(os.path.join(binned, name), text.replace("@WORK@", work))
 
         self.assertEqual(set(), snapshot(home), "the throwaway HOME did not start empty")
 
@@ -176,6 +183,10 @@ class DryRun(unittest.TestCase):
         return (done.returncode,
                 done.stdout.decode("utf-8", "replace"),
                 snapshot(home))
+
+
+class DryRun(SetupRun):
+    """The default mode, against a throwaway HOME that must stay empty."""
 
     def test_a_dry_run_writes_nothing_to_home(self):
         code, out, written = self.run_setup(STUB_CLAUDE_EMPTY)
@@ -273,6 +284,64 @@ class DryRun(unittest.TestCase):
         self.assertEqual(2, code, out)
         self.assertIn("unknown option --wat", out)
         self.assertEqual(set(), written)
+
+
+def stub_uname(kernel):
+    """A `uname` whose -s answer is `kernel`. Other flags never reach it."""
+    return "#!/bin/sh\necho '%s'\n" % kernel
+
+
+# A `claude` that records every call, so "stopped before doing anything" can be
+# asserted as "never so much as asked claude for its version".
+STUB_CLAUDE_RECORDING = r"""#!/bin/sh
+echo "$*" >> "@WORK@/claude-calls"
+exit 0
+"""
+
+
+class Platform(SetupRun):
+    """Unsupported platforms stop first and say so. (LC-24 criterion 2)
+
+    On native Windows the plugin installs and its hooks then do nothing,
+    silently, by design. setup.sh is the one place that can say so out loud.
+    """
+
+    def assert_refused(self, kernel, args=()):
+        code, out, written = self.run_setup(
+            STUB_CLAUDE_RECORDING, args=args,
+            extra_stubs={"uname": stub_uname(kernel)})
+        self.assertNotEqual(0, code, out)
+        self.assertIn("unsupported platform `%s`" % kernel, out)
+        self.assertIn("Nothing has been changed.", out)
+        self.assertIn("WSL", out, "the refusal should say what to do instead")
+        # Before changing anything: no section ran, claude was never invoked,
+        # and HOME is untouched - in --apply mode too.
+        self.assertNotIn("1. Tools this needs", out)
+        self.assertFalse(
+            os.path.exists(os.path.join(self.work, "claude-calls")),
+            "claude was invoked before the platform check refused:\n%s" % out)
+        self.assertEqual(set(), written)
+
+    def test_git_bash_mingw_is_refused(self):
+        self.assert_refused("MINGW64_NT-10.0-22631")
+
+    def test_msys_is_refused(self):
+        self.assert_refused("MSYS_NT-10.0-22631")
+
+    def test_cygwin_is_refused_even_with_apply(self):
+        self.assert_refused("CYGWIN_NT-10.0-22631", args=("--apply",))
+
+    def test_an_unknown_kernel_is_refused_not_guessed(self):
+        self.assert_refused("SunOS")
+
+    def test_linux_and_darwin_get_past_the_check(self):
+        for kernel in ("Linux", "Darwin"):
+            code, out, written = self.run_setup(
+                STUB_CLAUDE_READY, extra_stubs={"uname": stub_uname(kernel)})
+            self.assertEqual(0, code, "%s:\n%s" % (kernel, out))
+            self.assertNotIn("unsupported platform", out)
+            self.assertIn("1. Tools this needs", out)
+            self.assertEqual(set(), written)
 
 
 class NoWrongDoor(unittest.TestCase):

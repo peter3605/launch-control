@@ -206,6 +206,29 @@ Check that the file exists and, on a fresh clone, that it was committed.
 
 ---
 
+## The hooks do nothing
+
+**Symptom.** No `## Launch Control` banner at the start of a session, no story
+binding, no `Stop` nudge — and no error. The hooks are written never to fail a
+session, so every cause below looks identical. Rule them out in this order.
+
+1. **An unsupported platform — native Windows.** Launch Control supports macOS and
+   Linux, including WSL. Both hooks are bash scripts that call `python3`; on native
+   Windows the plugin installs and the hooks then do nothing, silently. Claude
+   Code's docs say it runs command hooks through Git Bash on Windows, or through
+   PowerShell when Git Bash is not installed (checked 2026-11-15, [hooks
+   reference](https://code.claude.com/docs/en/hooks)). Whether these hooks work
+   under Git Bash is **untested**, and under PowerShell they cannot. Check with
+   `uname -s` in the shell you launch Claude Code from: anything other than
+   `Darwin` or `Linux` (for example `MINGW64_NT-…`, `MSYS_NT-…`, `CYGWIN_NT-…`) is
+   this. `./setup.sh` refuses on those and names the platform. **Fix:** run Claude
+   Code inside WSL.
+2. **`python3` is not on `PATH`** — see [the section above](#python3-is-not-on-path).
+3. **No committed `.claude/launch-control.json`** in this repo. Both hooks open with
+   `[ -f launch-control.json ] || exit 0`.
+
+---
+
 ## What each `/lc:doctor` failure means
 
 `/lc:doctor` exits non-zero if any check fails. Every check in it was a real
