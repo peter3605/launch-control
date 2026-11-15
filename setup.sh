@@ -331,6 +331,8 @@ say "Then, in the repo you want on the board:"
 say ""
 say "  /lc:init          provisions both Notion databases, every property and view,"
 say "                    checks what it built, and writes this repo's config"
+say "  /lc:groom <item>  files one piece of work - a new board is empty, so"
+say "                    /lc:next has nothing to return until you file something"
 say "  /lc:next          hands you the first story a session can actually do"
 say ""
 if [ "$GH_READY" -eq 0 ] && command -v gh >/dev/null 2>&1; then
