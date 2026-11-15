@@ -1,0 +1,126 @@
+{
+  "_about": "Template launch stories for an iOS app that ships with this kit, in /lc:plan's proposal story format. They cover what a release takes that /lc:plan's clocks.json does not: clocks.json files the waits a third party sets (Apple enrollment, export compliance, Beta App Review, App Review), and these are the self-serve steps that have to be done before those waits are worth starting. Copy the ones that apply into a proposal or file them with /lc:groom, renumbering the drafts, adjusting paths to the app, and wiring blockedBy to the clocks filed for the same launch: R10 waits on apple-enroll, and app-review waits on R10. `appliesWhen` says which apps need a story: always, accounts (the app has sign-in), push, third-party-sign-in, ipad, or update (from the second release on). Every trap here was hit at least once by an app that shipped through this kit's scripts.",
+  "stories": [
+    {
+      "draft": "R1",
+      "appliesWhen": "always",
+      "name": "Install the iOS release kit and pass its configuration checks",
+      "type": "Launch Blocker",
+      "epic": "Build integrity",
+      "estimate": "S",
+      "gating": "Self-serve",
+      "agent": true,
+      "doneWhen": "`scripts/release/release.conf` is filled in with no REPLACE_ME left, and `scripts/release/check-release-ready.sh` passes its release config, Info.plist, source entitlements, log privacy and build secrets checks. Store copy and the privacy manifest are R3 and R4; the team ID in `ExportOptions.plist` is filled in by whoever holds the Apple account.",
+      "notes": "Install with the kit's `install.sh <repo> --apply`. `REQUIRED_ENTITLEMENTS` is per bundle and is the list that silently breaks a feature when signing drops it: an App Group on an app and its widget, `aps-environment` for push, associated domains for universal links and web credentials. Wire `check-log-privacy.sh` and `verify-entitlements.sh --source` into CI; they need no signing. Keep the build directory gitignored: `archive.sh` deletes and rebuilds it every run, and xcodebuild writes the launching shell's environment into it."
+    },
+    {
+      "draft": "R2",
+      "appliesWhen": "always",
+      "name": "Build once from Xcode on the release machine to create the managed profiles",
+      "type": "Launch Blocker",
+      "epic": "Build integrity",
+      "estimate": "XS",
+      "gating": "Self-serve",
+      "agent": false,
+      "doneWhen": "`scripts/release/verify-entitlements.sh` with no arguments (a signed device build) exits 0 on the machine that will archive the release.",
+      "notes": "Only Xcode.app can create the managed provisioning profiles without an App Store Connect API key: open the project, select a physical device, press Cmd-B. `xcodebuild -allowProvisioningUpdates` fails with No Accounts even when Xcode shows the team. Without the profiles a device build falls back to the wildcard profile and fails with \"doesn't include the ... capability\", which looks like a team or portal problem and is not one. An App Store export needs the same once-only step for its own profiles: Organizer, Distribute App, App Store Connect, once."
+    },
+    {
+      "draft": "R3",
+      "appliesWhen": "always",
+      "name": "Write the App Store listing copy",
+      "type": "Launch Blocker",
+      "epic": "Store listing",
+      "estimate": "M",
+      "gating": "Self-serve",
+      "agent": true,
+      "doneWhen": "`docs/store-copy.md` has a marked block for every field in `STORE_COPY_FIELDS`, and `scripts/release/check-store-copy.sh` exits 0.",
+      "notes": "The name block must be the exact name reserved in App Store Connect; a tagline appended to it is a different, unreserved name. Keywords live on the version page, not App Information, comma-separated with no spaces after the commas, and should not repeat words already in the name or subtitle. What's New does not exist on a 1.0: leave `whats_new` out of `STORE_COPY_FIELDS` until the second release, then rewrite it every release. The description, promotional text and What's New are plain text; Markdown shows up literally."
+    },
+    {
+      "draft": "R4",
+      "appliesWhen": "always",
+      "name": "Declare exactly the required-reason APIs the app uses in its privacy manifest",
+      "type": "Launch Blocker",
+      "epic": "Build integrity",
+      "estimate": "S",
+      "gating": "Self-serve",
+      "agent": true,
+      "doneWhen": "The privacy manifest check in `scripts/release/check-release-ready.sh` passes, and the story's Last session lists, for every API type declared in `PrivacyInfo.xcprivacy`, the call site in the app or a bundled SDK that needs it.",
+      "notes": "Declare exactly the required-reason APIs used. Missing one gets the upload rejected; declaring one the app does not use is flagged too. `UserDefaults` is the one nearly every app uses. Third-party SDKs carry their own manifests and are counted separately. The manifest must agree with the App Privacy answers in R5, so do this first."
+    },
+    {
+      "draft": "R5",
+      "appliesWhen": "always",
+      "name": "Answer App Privacy in App Store Connect to match the manifest and what the app collects",
+      "type": "Launch Blocker",
+      "epic": "Store listing",
+      "estimate": "S",
+      "gating": "Self-serve",
+      "agent": false,
+      "doneWhen": "App Store Connect's App Privacy section is published, and each data type it lists matches a row in a table in the repo naming the code that collects it.",
+      "notes": "Privacy labels that do not match what the app collects are among the most common first-submission rejections. Write the table in the repo first (an agent can, from the code), then enter it in App Store Connect. A server the app talks to counts: what the backend stores about a user is collected data."
+    },
+    {
+      "draft": "R6",
+      "appliesWhen": "always",
+      "name": "Shoot and upload the App Store screenshots",
+      "type": "Launch Blocker",
+      "epic": "Store listing",
+      "estimate": "M",
+      "gating": "Self-serve",
+      "agent": false,
+      "doneWhen": "App Store Connect shows screenshots at 1206x2622 and 1320x2868 for the version, plus iPad sizes if the app runs on iPad, and they show the current build's screens.",
+      "notes": "The required iPhone sizes changed to 1206x2622 and 1320x2868; older sizes are refused. An app whose `TARGETED_DEVICE_FAMILY` includes iPad needs iPad screenshots too, and reviewers do open the iPad build. Simulator captures at those sizes can be scripted; the upload is by hand. Re-shoot for any release that changes how the screens look."
+    },
+    {
+      "draft": "R7",
+      "appliesWhen": "accounts",
+      "name": "Give App Review a way to sign in, and write the review notes",
+      "type": "Launch Blocker",
+      "epic": "Beta and submission",
+      "estimate": "M",
+      "gating": "Self-serve",
+      "agent": true,
+      "doneWhen": "A dedicated review account signs in on a fresh install of the release build without reading a mailbox or being on any allowlist, its credentials are in the secret store (SSM for apps on the shared box) and not the repo, and `docs/app-review-notes.md` says how to use it and explains every sign-in option a reviewer cannot use.",
+      "notes": "Guideline 2.1 requires an active demo account or a fully featured demo mode. A reviewer cannot read a mailbox, so email sign-in links do not work for them, and cannot be on an OAuth provider's allowlist (a development-mode Spotify app, for one). A configured review address with a static code, inactive when unset, on an account seeded with data, works. Guideline 4.8: offering any third-party sign-in requires Sign in with Apple as an equivalent option. A button a reviewer taps and gets an error from reads as a broken feature; label it, and explain it in the notes. Apps with sign-up also need an in-app account deletion path."
+    },
+    {
+      "draft": "R8",
+      "appliesWhen": "push",
+      "name": "Reissue the APNs key for Sandbox and Production before the first TestFlight build",
+      "type": "Launch Blocker",
+      "epic": "Third-party access",
+      "estimate": "XS",
+      "gating": "Self-serve",
+      "agent": false,
+      "doneWhen": "The APNs auth key in use is enabled for Sandbox & Production in the developer portal, the server is configured for both environments, and a TestFlight build receives a push.",
+      "notes": "A key created for Sandbox only cannot send to the production APNs host, and TestFlight and App Store builds are production: their tokens are rejected as BadDeviceToken, with nothing in the app's logs. An App Store export rewrites `aps-environment` to production whatever the source says, so the server has to pick the host per device, from the environment the device reports."
+    },
+    {
+      "draft": "R9",
+      "appliesWhen": "update",
+      "name": "Prove the last release's stored data still opens in this build",
+      "type": "Launch Blocker",
+      "epic": "Correctness",
+      "estimate": "M",
+      "gating": "Self-serve",
+      "agent": true,
+      "doneWhen": "A test in CI opens a fixture store written by the code at the last released commit, through the current schema and migration plan, asserts counts and key values recorded when the fixture was made, and the CI check that runs it is green on the release commit.",
+      "notes": "The one kind of update that can strand a user's data is a model change that the shipped store cannot migrate through. Generate the fixture from the released commit, not from current code with old literals, and checkpoint any write-ahead log first. It has to exist before the first model change, not after. Turn on phased release for any version that migrates stored data."
+    },
+    {
+      "draft": "R10",
+      "appliesWhen": "always",
+      "name": "Archive, check and upload the release build",
+      "type": "Launch Blocker",
+      "epic": "Beta and submission",
+      "estimate": "S",
+      "gating": "Self-serve",
+      "agent": false,
+      "doneWhen": "`scripts/release/archive.sh` exits 0, the `.ipa` it left was uploaded with Transporter, the build shows in App Store Connect TestFlight without Missing Compliance, and the bumped build number is committed.",
+      "notes": "Set `MARKETING_VERSION` by hand first; `archive.sh` bumps only the build number. Every upload needs a new build number, a re-upload of the same release included, and a failed run puts the number back. Under automatic signing the archive is development-signed and Xcode re-signs on export, so `archive.sh` checks the export, not the archive. Upload with Transporter: Organizer re-signs the archive itself, so what it sends is not the file the checks read. Needs the signing identity, which is why it is not an agent's or CI's step. Decide phased release before submitting.",
+      "blockedBy": ["R1", "R2", "R3", "R4"]
+    }
+  ]
+}

@@ -283,6 +283,10 @@ the `/lc:` namespace, and moves the old copied commands and hooks into
 `.claude/_pre-plugin/` rather than deleting them. Its dry run is the default and prints
 all of it first.
 
+The iOS release kit is the other exception, and only when you run its installer
+yourself: `install.sh <repo> --apply` writes `scripts/release/` and, if absent,
+`docs/store-copy.md`. Nothing in the plugin runs it for you.
+
 ### How to remove it
 
 ```
@@ -403,6 +407,26 @@ Two hooks do the rest: `SessionStart` tells a session which story it is bound to
 and reads out that repo's standing warnings; `Stop` refuses a silent exit while a
 story is still claimed — once per story, so it nudges but never traps you.
 
+## Release kits
+
+A command can tell you a release story is open. It cannot tell you the export is
+missing an entitlement. Kits are the scripts that can, for one kind of launch, plus
+the template stories for what the scripts cannot do.
+
+**[`plugins/lc/kits/ios-release/`](plugins/lc/kits/ios-release/README.md)** makes an
+App Store release one checked command. `archive.sh` bumps the build number, archives,
+exports, and checks the *export* (build number, entitlements bundle by bundle, secrets
+written into the build tree), and puts the build number back if anything fails.
+`check-release-ready.sh` runs every check that needs no signing identity, so a session
+or CI can take it to green and leave only the signed half to you. Everything specific
+to the app lives in one `release.conf`; the scripts are replaced on re-install, and
+that file never is.
+
+Its `templates/stories.json` holds the release stories in `/lc:plan`'s format: listing
+copy, privacy manifest and labels, screenshots, App Review sign-in, the APNs key, data
+that must survive an update, and the signed archive itself. The waits Apple sets are
+already `/lc:plan`'s external clocks and are not repeated there.
+
 ## If you have hooks of your own
 
 The plugin ships its two hooks in `plugins/lc/hooks/hooks.json`. What happens when
@@ -462,7 +486,7 @@ opening a PR. See [`docs/config-reference.md`](docs/config-reference.md).
 
 ## Status
 
-v0.6.0, and honest about it: still pre-1.0, extracted from a working setup managing
+v0.7.0, and honest about it: still pre-1.0, extracted from a working setup managing
 five projects, and has one real user. The board is provisioned by `/lc:init`; projects on it are provisioned by `/lc:plan`.
 
 That version is carried in three places - `plugins/lc/.claude-plugin/plugin.json`,
