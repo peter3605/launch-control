@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Launch Control - check a repo's config for the regressions that fail silently.
 
-    doctor.py [--repo DIR] --views FILE     full check
+    doctor.py [--repo DIR] --views FILE --stories FILE --projects FILE   full check
     doctor.py [--repo DIR] --local-only     config and git only, no board
 
 Exits 1 if any check fails, 0 if every check that ran passed.
@@ -15,6 +15,12 @@ or a list of pages in order, and each page is one of:
     {"file": "<path>"}                         a saved raw view-mode result
     {"rows": [["APP-1", "Done"], ...], "hasMore": false}   Story ID and Status
 
+--stories and --projects are fetch results for the two databases, inline or saved
+to disk, in the form `init.py check` reads. They hold each data source's schema and
+every view's configuration, which are compared with init/board.json by the same
+code `init.py check` uses (boardcheck.py). When the plugin's board.json moves on, an
+existing board does not, and this is where that shows up as a named failure.
+
 Every check here was a real failure that went unnoticed until someone tripped on it.
 """
 import argparse
@@ -26,6 +32,14 @@ import shutil
 import subprocess
 import sys
 
+sys.dont_write_bytecode = True  # importing boardcheck must not litter the installed plugin
+# boardcheck imports nothing from here or from init.py, so this is not a cycle even
+# though init.py imports this file.
+from boardcheck import (spec, unwrap_saved, hex_id, ds_uuid, configure, road_spec,  # noqa: E402
+                        parse_database, check_properties, check_view)
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+INIT_PY = os.path.normpath(os.path.join(HERE, "..", "init", "init.py"))
 VIEW_KEYS = ("ready", "inProgress", "inReview", "waitingExternal", "yourTurn", "board", "road")
 
 failures = []
@@ -77,14 +91,6 @@ def read_json(path, what):
                          f"{path} (line {e.lineno} column {e.colno}: {e.msg})") from None
     except OSError as e:
         raise CheckError(f"{what} could not be read: {path} ({e.strerror or e})") from None
-
-
-def unwrap_saved(data):
-    """A large MCP tool result is saved to disk as a list of content blocks whose
-    text is the payload. Return that text; return anything else unchanged."""
-    if isinstance(data, list):
-        return "".join(b.get("text", "") for b in data if isinstance(b, dict))
-    return data
 
 
 def load_result(path, what="saved view result"):
@@ -185,12 +191,70 @@ def read_page(page, base):
     return None, False, f"unrecognised page entry {sorted(page)}"
 
 
+def check_schema(cfg, stories_path, projects_path):
+    """Hold the board this repo is on to board.json: every property, and every view
+    in the config. A board provisioned by an older plugin keeps its old schema when
+    the plugin updates, and nothing else notices until a command misbehaves."""
+    missing = [f"--{k}" for k, v in (("stories", stories_path), ("projects", projects_path)) if not v]
+    if missing:
+        fail(f"board schema was not checked - pass {' and '.join(missing)} "
+             "(a check that did not run is not a pass)")
+        return
+    s = spec()
+    ds_urls = {k: (cfg.get(k) or {}).get("dataSource") or "" for k in ("projects", "stories")}
+    parsed = {}
+    for k, path in (("projects", projects_path), ("stories", stories_path)):
+        try:
+            parsed[k] = parse_database(path)
+        except (OSError, ValueError) as e:
+            fail(f"{k}: could not read the fetch result: {e}")
+            continue
+        have = ds_uuid(parsed[k][0].get("url"))
+        if not ds_uuid(ds_urls[k]):
+            fail(f"{k}: no {k}.dataSource in the config to check the fetch against")
+        elif have != ds_uuid(ds_urls[k]):
+            fail(f"{k}: {path} is data source {have or '(unknown)'}, "
+                 f"but {k}.dataSource is {ds_uuid(ds_urls[k])} - fetch {k}.database")
+            del parsed[k]
+            continue
+        # A lost property is fixed on the board; init.py ddl prints its definition.
+        ddl = (f"python3 {INIT_PY} ddl projects" if k == "projects"
+               else f"python3 {INIT_PY} ddl stories --projects-ds {ds_urls['projects'] or '<projects data source>'}")
+        check_properties(s[k]["title"], s[k], parsed[k][0], ds_urls, ok,
+                         lambda m, ddl=ddl: fail(f"{m} - fix it on the board to match board.json; "
+                                                 f"`{ddl}` prints every property's definition"))
+    if "stories" not in parsed:
+        return
+
+    views = parsed["stories"][1]
+    config_views = cfg.get("views") or {}
+    for v in s["views"]:
+        if config_views.get(v["key"]):
+            check_view(v["key"], v, config_views[v["key"]], views, ok,
+                       lambda m, v=v: fail(f"{m} - fix: configure it as `{configure(v)}` "
+                                           f"(`python3 {INIT_PY} views` prints every view's configure line)"))
+    if not config_views.get("road"):
+        return
+    page = hex_id(cfg.get("projectPageId"))
+    if not page:
+        skip("views.road filter - no projectPageId in the config to compare it with")
+        return
+    key = cfg.get("project") or "<project key>"
+    url = f"https://www.notion.so/{page}"
+    road = road_spec(key, url, s)
+    check_view("road", road, config_views["road"], views, ok,
+               lambda m: fail(f"{m} - fix: configure it as `{configure(road)}` "
+                              f"(`python3 {INIT_PY} views --road --key {key} --project-url {url}` prints it)"))
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--repo", default=os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
     mode = ap.add_mutually_exclusive_group(required=True)
     mode.add_argument("--views", help="JSON file of view query results, see above")
     mode.add_argument("--local-only", action="store_true", help="skip every check that needs the board")
+    ap.add_argument("--stories", help="fetch result for the Stories database, see above")
+    ap.add_argument("--projects", help="fetch result for the Projects database, see above")
     args = ap.parse_args()
 
     repo = os.path.abspath(args.repo)
@@ -307,6 +371,13 @@ def main():
             else:
                 ok("no Story ID appears on two rows")
             status = dict(rows)
+
+    # ----------------------------------------------------------- board schema
+    print("\nBoard schema against board.json")
+    if args.local_only:
+        skip("properties and view filters - run with --stories and --projects for a full check")
+    else:
+        check_schema(cfg, args.stories, args.projects)
 
     # ---------------------------------------------------------------- notices
     print("\nStanding notices")

@@ -9,6 +9,8 @@ gap shows up as a red build rather than as a number nobody checked.
 This is what satisfies LC-B8's "a deliberately broken computation fails the build".
 LC-23 extended it past mine.py: init.py check's comparison with board.json and
 plan.py next-id's ledger lookup are guarded the same way, by test_init and test_plan.
+LC-B12 moved that comparison into boardcheck.py, shared with doctor.py, so its
+mutations now target boardcheck.py and must be caught by BOTH callers' suites.
 
 Each mutation is a single-token edit to a real computation. If you change mine.py
 and a mutation stops applying, the guard fails loudly rather than skipping - a
@@ -23,7 +25,8 @@ import unittest
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MINE = os.path.join("plugins", "lc", "skills", "mine", "mine.py")
-INIT = os.path.join("plugins", "lc", "skills", "init", "init.py")
+BOARDCHECK = os.path.join("plugins", "lc", "skills", "doctor", "boardcheck.py")
+DOCTOR = os.path.join("plugins", "lc", "skills", "doctor", "doctor.py")
 PLAN = os.path.join("plugins", "lc", "skills", "plan", "plan.py")
 
 # (name, exact source to replace, replacement, what it breaks)
@@ -81,7 +84,7 @@ MUTATIONS = [
 BOARD_MUTATIONS = [
     (
         "init_check_compares_only_the_number_of_view_filters",
-        INIT,
+        BOARDCHECK,
         "if have != [tuple(e) for e in expect]:",
         "if len(have) != len(expect):",
         "a view filtered on the wrong value would pass as provisioned",
@@ -89,7 +92,7 @@ BOARD_MUTATIONS = [
     ),
     (
         "init_check_ignores_missing_select_options",
-        INIT,
+        BOARDCHECK,
         'lost = [n for n, _ in p["options"] if n not in names]',
         "lost = []",
         "a Status select without In Review would pass, and /lc:done would set an option that does not exist",
@@ -97,11 +100,19 @@ BOARD_MUTATIONS = [
     ),
     (
         "init_check_ignores_view_sorts",
-        INIT,
+        BOARDCHECK,
         "if sorts != want_sorts:",
         "if False:",
         "a view sorted wrongly would pass, and /lc:next would pick out of Seq order",
         "tests.test_init",
+    ),
+    (
+        "doctor_never_compares_the_schema",
+        DOCTOR,
+        "        check_schema(cfg, args.stories, args.projects)\n",
+        "        pass\n",
+        "a board that predates the plugin would get a clean bill of health from /lc:doctor",
+        "tests.test_doctor",
     ),
     (
         "plan_next_id_ignores_the_ledger",
@@ -169,10 +180,10 @@ class MutationGuard(unittest.TestCase):
         self.assertEqual(r.returncode, 0,
                          f"the copied tree must pass before mutations mean anything:\n{r.stderr}")
 
-    def test_the_unmutated_tree_passes_init_and_plan(self):
+    def test_the_unmutated_tree_passes_init_plan_and_doctor(self):
         with tempfile.TemporaryDirectory() as tmp:
             build_tree(tmp)
-            for module in ("tests.test_init", "tests.test_plan"):
+            for module in ("tests.test_init", "tests.test_plan", "tests.test_doctor"):
                 r = run_suite(tmp, module)
                 self.assertEqual(r.returncode, 0,
                                  f"{module} must pass on the copied tree before mutations mean anything:\n{r.stderr}")
@@ -212,6 +223,10 @@ for _n, _o, _w, _y in MUTATIONS:
     setattr(MutationGuard, f"test_caught_{_n}", _make(_n, _o, _w, _y))
 for _n, _t, _o, _w, _y, _m in BOARD_MUTATIONS:
     setattr(MutationGuard, f"test_caught_{_n}", _make_board(_n, _t, _o, _w, _y, _m))
+    if _t == BOARDCHECK:
+        # The comparison is shared, so each caller's suite must notice it break.
+        setattr(MutationGuard, f"test_caught_{_n}_by_doctor",
+                _make_board(f"{_n}_by_doctor", _t, _o, _w, _y, "tests.test_doctor"))
 
 
 if __name__ == "__main__":
