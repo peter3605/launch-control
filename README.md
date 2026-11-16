@@ -439,6 +439,7 @@ properties that carry weight, and the views each command reads.
 | `/lc:next` | Hands you the next unblocked story this session can actually do, traps read out in full |
 | `/lc:start <ID>` | Binds the session to a story: status, branch, `.current-story` |
 | `/lc:done` | Verifies the criteria, ships through a PR, merges by policy, records, unblocks dependents |
+| `/lc:release <reason>` | Drops the bound story without shipping it: back to Ready, or Backlog if a blocker is not Done, with the reason in Last session. Unbinds the session; the branch and its commits stay where they are |
 | `/lc:mine [prefix]` | The work only a human can do: clocks by lead days with projected finish dates, your desk by estimate, and the one item to start today with its arithmetic |
 | `/lc:status` | Where every project stands |
 | `/lc:groom <what>` | Files something newly discovered, with real acceptance criteria |
@@ -447,7 +448,8 @@ properties that carry weight, and the views each command reads.
 
 Two hooks do the rest: `SessionStart` tells a session which story it is bound to
 and reads out that repo's standing warnings; `Stop` refuses a silent exit while a
-story is still claimed — once per story, so it nudges but never traps you.
+story is still claimed — once per story, so it nudges but never traps you. A story
+released with `/lc:release` is no longer claimed, so it is not nudged about.
 
 ## Release kits
 
@@ -528,7 +530,7 @@ opening a PR. See [`docs/config-reference.md`](docs/config-reference.md).
 
 ## Status
 
-v0.14.0: pre-1.0, extracted from a working setup that manages five projects. The
+v0.15.0: pre-1.0, extracted from a working setup that manages five projects. The
 board is provisioned by `/lc:init`; projects on it are provisioned by `/lc:plan`.
 
 What this is *not* is a tracker for the steps inside a story. Keep those wherever

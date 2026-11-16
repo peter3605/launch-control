@@ -67,7 +67,7 @@ Ten, each answering one question. Every one is referenced by name in
 | `waitingExternal` | Gating is `External`, not Done | `/lc:status` |
 | `road` | **Project is this one**, Done rows included. One per project | `/lc:groom` (ID allocation and its duplicate check), `/lc:doctor` (duplicate IDs), `/lc:plan` |
 | `next` | **Project is this one**, Status is `Ready` **and** Agent can do this is checked. One per project | `/lc:next` |
-| `open` | **Project is this one**, Status is not `Done`. One per project | `/lc:start`, `/lc:reconcile` |
+| `open` | **Project is this one**, Status is not `Done`. One per project | `/lc:start`, `/lc:release`, `/lc:reconcile` |
 | `dependents` | Status is not `Done` **and** Blocked by is not empty, every project | `/lc:done` and `/lc:reconcile`, to find what a closed story unblocks |
 | `board` | Grouped by Status, unfiltered, every project | `/lc:plan` (is a prefix free?) |
 

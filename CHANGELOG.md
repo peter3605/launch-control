@@ -17,6 +17,31 @@ enforces it; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
+## 0.15.0 — 2026-11-15
+
+**A session can drop a bound story without shipping it.** (LC-B17)
+
+- **Why.** `/lc:done` was the only exit from a bound story, and it is built to ship.
+  Dropping one meant editing Notion by hand and deleting `.claude/.current-story`,
+  and the Stop hook still nudged once about a story nobody was working on.
+- **New skill `/lc:release <reason>`.** On a bound story it fetches every
+  **Blocked by** page and sets Status back to `Ready`, or to `Backlog` when any
+  blocker is not Done; appends a dated **Last session** line with the reason; and
+  empties `.claude/.current-story` and `.claude/.nudged`. The branch, its commits
+  and any uncommitted changes are left in place and reported by name. With no story
+  bound it says so and changes nothing. A story `In Review` (an open PR) asks before
+  it is released. **Started** is never touched, so an External clock keeps counting.
+- **A skill, not a `/lc:start --abandon` flag.** Skills receive their arguments as
+  free text and parse no flags; `/lc:start`'s argument is a story ID and this one's
+  is a reason. A separate command is listed in the slash menu and the README table,
+  and the Stop hook and SessionStart banner can name it.
+- The Stop hook's nudge and the SessionStart banner for a bound session now mention
+  `/lc:release` for work being dropped rather than paused. Neither hook nudges once
+  the binding is empty; `tests/test_hooks.py` pins that, and that the README
+  Commands table lists every skill.
+
+---
+
 ## 0.14.0 — 2026-11-15
 
 **Board reads stop growing with the project's Done history.** (LC-30)

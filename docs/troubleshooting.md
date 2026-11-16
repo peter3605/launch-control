@@ -351,7 +351,7 @@ loudly (LC-B15):
 
 | Input | Read by | Inline form |
 |---|---|---|
-| A page of a view (`board`, `road`) for an ID lookup or dependents | `ids.py` (`/lc:done`, `/lc:reconcile`, `/lc:start`, `/lc:groom`) | `--inline-page COUNT HAS_MORE` plus one `--row ID STATUS URL BLOCKERS` per row. A count that differs from the rows, a URL with no page id or a malformed blocker list is a FAIL. |
+| A page of a view (`board`, `road`) for an ID lookup or dependents | `ids.py` (`/lc:done`, `/lc:reconcile`, `/lc:start`, `/lc:release`, `/lc:groom`) | `--inline-page COUNT HAS_MORE` plus one `--row ID STATUS URL BLOCKERS` per row. A count that differs from the rows, a URL with no page id or a malformed blocker list is a FAIL. |
 | A shared view's page, only checked to resolve | `doctor.py` | `{"resolved": true}`: nothing is copied. |
 | A `road` or `next` page | `doctor.py`, `plan.py` | `{"count": N, "rows": [[ID, Status], ...], "hasMore": bool}`. `count` must match. |
 | A page of `yourTurn` | `mine.py` (`/lc:mine`) | `--inline FILE`: `{"count": N, "hasMore": bool, "rows": [...]}`, where each row has only the ten fields `mine.py` reads. A count mismatch, an unexpected key (a copied Notes field, say), a bad URL, Status or Gating, or a lead day that is not a number is a FAIL. |
