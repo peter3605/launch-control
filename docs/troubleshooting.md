@@ -249,7 +249,8 @@ is blunt.
 
 | It says | What it means |
 |---|---|
-| `missing view keys: ...` | `views` is missing one of the seven the commands read. `/lc:init` writes all seven; a hand-edited config is the usual cause. |
+| `missing view keys: ...` | `views` is missing one of the eight the commands read. `/lc:init` writes all eight; a hand-edited config is the usual cause. |
+| `views.next is missing - a board provisioned before 0.10.0 ...` | This project has no `next` view, the one `/lc:next` reads (its Ready, agent-doable stories). Until it does, `/lc:next` falls back to reading the whole road. Create a table view on the Stories database with the name and `configure` line the message gives, and add its URL to `views.next`. |
 | `views.X points at a database other than stories.database` | A copied-and-pasted URL from a different board. Every view must belong to the Stories database named in the same config. |
 | `views.X has no ?v= view id - it opens the database, not a view` | The URL was copied from the database page rather than from a specific view, so it ignores that view's filters. This is how a "scoped" query quietly stops being scoped. |
 | `views.X was not queried - a check that did not run is not a pass` | The session skipped a view when gathering results. Re-run `/lc:doctor`. |
@@ -262,6 +263,8 @@ is blunt.
 | `views.road returned zero rows - a scoping bug reads exactly like a clean board` | The most dangerous result in the whole tool. An empty backlog and a broken filter are indistinguishable from the output, so this is always a failure. Open the road view in Notion and check its filter. |
 | `views.road was not read to the last page - duplicates cannot be ruled out` | The result was paginated and only the first page was read, so the duplicate check below could not run honestly. |
 | `views.road returned Story IDs outside PREFIX-` | The road view is not filtered to this project. It is meant to show one project alone; a shared browse view must never be substituted for it. |
+| `views.next returned Story IDs outside PREFIX-` | The next view is not filtered to this project, so `/lc:next` would hand out another repo's work. Fix its filter with the line `init.py views --next` prints. |
+| `views.next returned stories that are not Ready` | The next view lost its Status filter. Same fix. An empty next view is fine: nothing is Ready. |
 | `Story ID on more than one row` | Two stories carry the same ID. Every command that looks a story up by ID will now find the wrong one roughly half the time. Fix it on the board. |
 
 ### Board schema against board.json
@@ -283,6 +286,7 @@ about a schema difference is your call.
 | `views.X ('Name'): sort is [...], not [...]` / `not grouped by 'Status'` / `type is ...` | Same fix, the same `configure` line. A view out of `Seq` order makes `/lc:next` pick the wrong story. |
 | `views.X: ... is not a view of the Stories database` | The view in the config does not appear in the database fetch. It was deleted, or it belongs to another database. |
 | `views.road ...: filter is ...` | The road view is not filtered to this project's row (`projectPageId`). The message carries the `init.py views --road` command that prints its `configure` line. |
+| `views.next ...: filter is ...` | The same for the next view. `init.py views --next` prints its line. |
 | `skip views.road filter - no projectPageId in the config` | There is no `projectPageId` to compare the road's filter with. Not a failure; the road's prefix check above still runs. |
 | `stories: ... is data source X, but stories.dataSource is Y` | The fetch is of a different database from the one the config names. Re-run `/lc:doctor`, fetching `stories.database` and `projects.database` from this repo's config. |
 | `board schema was not checked - pass --stories and --projects` | The session ran a full check without the two database fetches. Re-run `/lc:doctor`. |

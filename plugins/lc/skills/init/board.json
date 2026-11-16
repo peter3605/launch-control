@@ -73,5 +73,10 @@
   "road": {"key": "road", "name": "Road — {key}", "type": "table",
            "filters": [["Project", "contains", "{project_url}"]],
            "sorts": [["Seq", "ASC"]],
-           "show": ["Name", "Story ID", "Status", "Type", "Seq", "Estimate", "Gating", "Agent can do this", "Done when"]}
+           "show": ["Name", "Story ID", "Status", "Type", "Seq", "Estimate", "Gating", "Agent can do this", "Done when"]},
+  "next": {"key": "next", "name": "Next — {key}", "type": "table",
+           "_comment": "What /lc:next reads: this project's Ready, agent-doable stories and nothing else. The shared ready view holds every project's, so on a board with several projects one read of it overflowed the tool's output limit (LC-28).",
+           "filters": [["Project", "contains", "{project_url}"], ["Status", "is", "Ready"], ["Agent can do this", "is", true]],
+           "sorts": [["Seq", "ASC"]],
+           "show": ["Name", "Story ID", "Estimate", "Epic", "Blocked by", "Done when", "Notes and traps"]}
 }

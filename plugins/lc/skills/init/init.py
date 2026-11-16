@@ -7,6 +7,7 @@
     init.py ddl blocked-by --stories-ds DS             the self-relation, added after create
     init.py views                                      the six shared views, as JSON
     init.py views --road --key KEY --project-url URL   this project's road view, as JSON
+    init.py views --next --key KEY --project-url URL   this project's next view, as JSON
     init.py record --state STATE --key KEY --url URL [--data-source DS]
     init.py check --state STATE --stories FILE --projects FILE [--view FILE ...]
     init.py board --state STATE --out FILE             a board file for plan.py config --from
@@ -20,7 +21,7 @@ board.json is the board. The DDL and view configs are generated from it, and
 created and what is verified cannot drift apart.
 
 STATE is this run's ledger ({"hub", "projects", "stories", "blockedBy", "views":
-{key: url}, "project", "road"}). It is what makes a failed run resumable instead of
+{key: url}, "project", "road", "next"}). It is what makes a failed run resumable instead of
 a second board, and it lives in .claude/lc-init/, which ignores itself: it holds
 Notion IDs, and in a public repo those stay out of history.
 
@@ -43,7 +44,8 @@ from doctor import load_json, git  # noqa: E402
 # The comparison with board.json is shared with doctor.py, which holds an existing
 # board to the same contract. It lives in its own module so neither script imports
 # the other for it.
-from boardcheck import (spec, hex_id, view_id, ds_uuid, configure, repair, road_spec,  # noqa: E402
+from boardcheck import (spec, hex_id, view_id, ds_uuid, configure, repair, PROJECT_VIEWS,  # noqa: E402
+                        project_view_spec,
                         fetch_text, parse_views, parse_database, check_properties, check_view)
 
 SHARED_VIEWS = ("ready", "inProgress", "inReview", "waitingExternal", "yourTurn", "board")
@@ -172,10 +174,11 @@ def cmd_ddl(args):
 
 # ------------------------------------------------------------------- views
 def cmd_views(args):
-    if args.road:
+    which = [w for w in PROJECT_VIEWS if getattr(args, w)]
+    if which:
         if not (args.key and args.project_url):
-            raise SystemExit("views --road needs --key and --project-url")
-        views = [road_spec(args.key, args.project_url)]
+            raise SystemExit(f"views --{which[0]} needs --key and --project-url")
+        views = [project_view_spec(w, args.key, args.project_url) for w in which]
     else:
         views = spec()["views"]
     print(json.dumps([{"key": v["key"], "name": v["name"], "type": v["type"], "configure": configure(v)}
@@ -198,7 +201,7 @@ def cmd_record(args):
         if not args.data_source:
             raise SystemExit(f"record {key} needs --data-source")
         value = {"database": f"https://www.notion.so/{hex_id(args.url)}", "dataSource": f"collection://{ds_uuid(args.data_source)}"}
-    elif key.startswith("views.") or key == "road":
+    elif key.startswith("views.") or key in PROJECT_VIEWS:
         db = hex_id((state.get("stories") or {}).get("database"))
         if not db:
             raise SystemExit("record the stories database before any view")
@@ -270,13 +273,14 @@ def cmd_check(args):
                 continue
             check_view(v["key"], v, recorded[v["key"]], views, ok,
                        lambda m, v=v: fail(f"{m} - {repair(v)} (`init.py views` prints every view's configure line)"))
-        if state.get("road"):
-            # The name is not checked, only the filter, so the key does not matter here.
-            road = road_spec("", state.get("project", ""), s)
-            check_view("road", road, state["road"], views, ok,
-                       lambda m: fail(f"{m} - {repair(road)} (`init.py views --road` prints it)"))
-        elif state.get("project"):
-            fail("the project row exists but its road view was never created")
+        for w in PROJECT_VIEWS:
+            if state.get(w):
+                # The name is not checked, only the filter, so the key does not matter here.
+                pv = project_view_spec(w, "", state.get("project", ""), s)
+                check_view(w, pv, state[w], views, ok,
+                           lambda m, pv=pv, w=w: fail(f"{m} - {repair(pv)} (`init.py views --{w}` prints it)"))
+            elif state.get("project"):
+                fail(f"the project row exists but its {w} view was never created")
     return finish()
 
 
@@ -311,12 +315,13 @@ def main():
 
     c = sub.add_parser("views")
     c.add_argument("--road", action="store_true")
+    c.add_argument("--next", action="store_true")
     c.add_argument("--key")
     c.add_argument("--project-url")
 
     c = sub.add_parser("record")
     c.add_argument("--state", required=True)
-    c.add_argument("--key", required=True, help="hub, projects, stories, blockedBy, views.<key>, project, road")
+    c.add_argument("--key", required=True, help="hub, projects, stories, blockedBy, views.<key>, project, road, next")
     c.add_argument("--url", required=True)
     c.add_argument("--data-source")
 

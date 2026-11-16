@@ -35,12 +35,13 @@ import sys
 sys.dont_write_bytecode = True  # importing boardcheck must not litter the installed plugin
 # boardcheck imports nothing from here or from init.py, so this is not a cycle even
 # though init.py imports this file.
-from boardcheck import (spec, unwrap_saved, hex_id, ds_uuid, repair, road_spec,  # noqa: E402
+from boardcheck import (spec, unwrap_saved, hex_id, ds_uuid, configure, repair, PROJECT_VIEWS,  # noqa: E402
+                        project_view_spec,
                         parse_database, check_properties, check_view)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 INIT_PY = os.path.normpath(os.path.join(HERE, "..", "init", "init.py"))
-VIEW_KEYS = ("ready", "inProgress", "inReview", "waitingExternal", "yourTurn", "board", "road")
+VIEW_KEYS = ("ready", "inProgress", "inReview", "waitingExternal", "yourTurn", "board", "road", "next")
 
 failures = []
 
@@ -233,18 +234,34 @@ def check_schema(cfg, stories_path, projects_path):
             check_view(v["key"], v, config_views[v["key"]], views, ok,
                        lambda m, v=v: fail(f"{m} - {repair(v)} "
                                            f"(`python3 {INIT_PY} views` prints every view's configure line)"))
-    if not config_views.get("road"):
-        return
     page = hex_id(cfg.get("projectPageId"))
-    if not page:
-        skip("views.road filter - no projectPageId in the config to compare it with")
-        return
     key = cfg.get("project") or "<project key>"
     url = f"https://www.notion.so/{page}"
-    road = road_spec(key, url, s)
-    check_view("road", road, config_views["road"], views, ok,
-               lambda m: fail(f"{m} - {repair(road)} "
-                              f"(`python3 {INIT_PY} views --road --key {key} --project-url {url}` prints it)"))
+    for w in PROJECT_VIEWS:
+        if not config_views.get(w):
+            continue
+        if not page:
+            skip(f"views.{w} filter - no projectPageId in the config to compare it with")
+            continue
+        pv = project_view_spec(w, key, url, s)
+        check_view(w, pv, config_views[w], views, ok,
+                   lambda m, pv=pv, w=w: fail(f"{m} - {repair(pv)} "
+                                              f"(`python3 {INIT_PY} views --{w} --key {key} --project-url {url}` prints it)"))
+
+
+def missing_next(cfg):
+    """The migration line for a config from before the per-project next view (0.10.0).
+
+    Its absence is a FAIL, not a skip: /lc:next without it falls back to reading the
+    whole road, which works but is the slow path, and nothing else would ever say so."""
+    page = hex_id(cfg.get("projectPageId"))
+    key = cfg.get("project") or "<project key>"
+    url = f"https://www.notion.so/{page}" if page else "<this project's Projects page URL>"
+    pv = project_view_spec("next", key, url)
+    return (f"views.next is missing - a board provisioned before 0.10.0 has no per-project next view, so /lc:next "
+            f"falls back to reading the whole road. Create a table view on the Stories database named {pv['name']!r}, "
+            f"configured as `{configure(pv)}`, and add its URL to views.next "
+            f"(`python3 {INIT_PY} views --next --key {key} --project-url {url}` prints it)")
 
 
 def main():
@@ -288,10 +305,13 @@ def main():
     print("\nViews in config")
     views = cfg.get("views") or {}
     missing = [k for k in VIEW_KEYS if not views.get(k)]
+    if "next" in missing:
+        fail(missing_next(cfg))
+        missing.remove("next")
     if missing:
         fail(f"missing view keys: {', '.join(missing)}")
-    else:
-        ok("all seven view keys present")
+    elif views.get("next"):
+        ok("all eight view keys present")
     db = notion_id((cfg.get("stories") or {}).get("database"))
     for k in VIEW_KEYS:
         url = views.get(k)
@@ -348,6 +368,18 @@ def main():
                 rows += page_rows
             if error:
                 fail(f"views.{k} did not resolve: {error}")
+                continue
+            if k == "next":
+                # This project's alone, like the road, but it may well be empty: a
+                # project with nothing Ready is not a scoping bug.
+                foreign = sorted({i or "(blank)" for i, _ in rows if not i.startswith(f"{prefix}-")})
+                not_ready = sorted({i for i, st in rows if st and st != "Ready"})
+                if foreign:
+                    fail(f"views.next returned Story IDs outside {prefix}-: {', '.join(foreign)}")
+                if not_ready:
+                    fail(f"views.next returned stories that are not Ready: {', '.join(not_ready)}")
+                if not (foreign or not_ready):
+                    ok(f"views.next resolves ({len(rows)} row{'' if len(rows) == 1 else 's'}, all {prefix}- and Ready)")
                 continue
             if k != "road":
                 # The other six are shared across projects by design, so they may be

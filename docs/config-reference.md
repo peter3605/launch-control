@@ -14,7 +14,7 @@ differences live.
 ## Board
 
 `stories` and `projects` each carry a `database` URL and a `dataSource`
-(`collection://...`). `views` carries seven named view URLs — see
+(`collection://...`). `views` carries eight named view URLs — see
 [notion-schema.md](notion-schema.md) for what each view must filter on.
 
 Query views in **view mode**, never SQL or rows mode. On Notion's free plan, SQL
@@ -29,7 +29,8 @@ board-wide: dependents in other projects, whether a prefix is free). Keep
 Every one of these can break without anything erroring. Run `/lc:doctor` after
 editing this file by hand: it fails on a missing view key, a view URL that does not
 resolve or points at another database, a `road` view that is empty or returns
-another project's stories, a Story ID on two rows, a `baseBranch` that is not
+another project's stories, a missing `next` view (boards from before 0.10.0) or one
+holding another project's stories, a Story ID on two rows, a `baseBranch` that is not
 the remote's default branch, and a board whose properties or view filters no
 longer match the plugin's `board.json`.
 

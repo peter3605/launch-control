@@ -18,7 +18,8 @@
     "waitingExternal": "https://www.notion.so/<db>?v=<view id>",
     "yourTurn": "https://www.notion.so/<db>?v=<view id>",
     "board": "https://www.notion.so/<db>?v=<view id>",
-    "road": "https://www.notion.so/<db>?v=<view id>"
+    "road": "https://www.notion.so/<db>?v=<view id>",
+    "next": "https://www.notion.so/<db>?v=<view id>"
   },
   "note": "Read the board in VIEW mode only - it has no quota on the free Notion plan. SQL and rows mode share one metered workspace allowance.",
   "dependencies": "'Blocked by' is a RELATION (pass page URLs, not story IDs). 'Blocked by IDs' and 'Blocker status' are rollups - they render in Notion's UI but return opaque handles to the API, so resolve blockers by fetching the linked pages. Status=Ready already means unblocked.",

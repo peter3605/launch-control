@@ -54,17 +54,18 @@ does not create any (see [decision 0001](decisions/0001-native-tasks.md)); add
 
 ## Views
 
-Seven, each answering one question. Every one is referenced by name in
+Eight, each answering one question. Every one is referenced by name in
 `launch-control.json`.
 
 | Key | Filter | Read by |
 |---|---|---|
-| `ready` | Status is `Ready` **and** Agent can do this is checked | `/lc:next` |
+| `ready` | Status is `Ready` **and** Agent can do this is checked, every project | `/lc:next` for a project the user names |
 | `yourTurn` | Agent can do this is **un**checked, not Done. **No Type filter, deliberately** | `/lc:mine` |
 | `inProgress` | Status is `In Progress` | `/lc:status` |
 | `inReview` | Status is `In Review` | `/lc:status` |
 | `waitingExternal` | Gating is `External`, not Done | `/lc:status` |
-| `road` | **Project is this one.** One per project | `/lc:reconcile` |
+| `road` | **Project is this one.** One per project | `/lc:reconcile`, `/lc:start`, `/lc:groom` |
+| `next` | **Project is this one**, Status is `Ready` **and** Agent can do this is checked. One per project | `/lc:next` |
 | `board` | Grouped by Status, for reading | — |
 
 ### Why `road` is per-project and not one shared view
@@ -75,6 +76,19 @@ scoping bug reads exactly like a clean bill of health. `/lc:reconcile` therefore
 refuses to run if zero rows come back or if a returned Story ID does not match the
 repo's prefix. Keep a free-for-all browse view if you want one, but do not
 reference it from any command.
+
+### Why `/lc:next` reads `next` and not `ready`
+
+`ready` holds every project's Ready rows. `/lc:next` used to read it and keep its own
+prefix afterwards, which downloaded the whole board's Ready work to pick one row. On
+a board with six projects that was 30 rows and about 120 KB, past the tool's output
+limit, and the read had to be parsed back out of a dump file (LC-28, 2026-11-15).
+Reading `road` and filtering in the session would not fix it either: the road carries
+every Done row too. So each project gets a second view of its own, filtered the way
+`/lc:next` needs, and the shared `ready` stays for a human browsing the board.
+
+`/lc:mine` reads `yourTurn` across every project on purpose and was left alone: a
+clock in one project can block another, so its chains need the whole board.
 
 ### Why `yourTurn` has no Type filter
 

@@ -9,7 +9,7 @@
     plan.py record   --state STATE --draft D --id ID --url URL [--replace]
     plan.py verify   --state STATE --board FILE --prefix P
     plan.py config   --repo DIR --from SIBLING_CONFIG --project KEY --prefix P
-                     --project-page URL --road URL
+                     --project-page URL --road URL --next URL
 
 Every subcommand exits 1 on a failure and 0 otherwise, so the verdict is the
 script's and not the session's. Like doctor.py it cannot reach Notion: the skill
@@ -132,7 +132,7 @@ def load_state(path):
 
 def filed(state):
     """The stories in a state file. Keys starting with _ are the run's provisioning
-    records (_project, _road), not stories."""
+    records (_project, _road, _next), not stories."""
     return {d: v for d, v in state.items() if not d.startswith("_")}
 
 
@@ -654,8 +654,11 @@ def cmd_config(args):
                if not (sib.get("views") or {}).get(k)]
     if missing:
         fail(f"sibling config is missing shared views: {', '.join(missing)}")
-    if "v=" not in args.road:
-        fail("--road has no ?v= view id")
+    for flag, url in (("--road", args.road), ("--next", args.next)):
+        if "v=" not in url:
+            fail(f"{flag} has no ?v= view id")
+    if args.road == args.next:
+        fail("--road and --next are the same view - next is a second view, filtered to Ready stories")
     if problems:
         return finish()
 
@@ -667,8 +670,10 @@ def cmd_config(args):
         base = git(repo, "symbolic-ref", "--short", "HEAD") or "main"
         warn(f"no reachable origin - baseBranch set to the current branch {base!r}; check it before /lc:done")
 
-    views = {k: v for k, v in sib["views"].items() if k != "road"}
+    # A sibling's road and next are its own project's; this project gets its own.
+    views = {k: v for k, v in sib["views"].items() if k not in ("road", "next")}
     views["road"] = args.road
+    views["next"] = args.next
     cfg = {
         "project": args.project,
         "prefix": args.prefix,
@@ -741,7 +746,7 @@ def main():
 
     c = sub.add_parser("record")
     c.add_argument("--state", required=True)
-    c.add_argument("--draft", required=True, help="a draft ID, or _project / _road")
+    c.add_argument("--draft", required=True, help="a draft ID, or _project / _road / _next")
     c.add_argument("--id", default="")
     c.add_argument("--url", required=True)
     c.add_argument("--replace", action="store_true", help="renumbering a row that lost an ID race")
@@ -758,6 +763,7 @@ def main():
     c.add_argument("--prefix", required=True)
     c.add_argument("--project-page", required=True)
     c.add_argument("--road", required=True)
+    c.add_argument("--next", required=True, help="this project's next view, what /lc:next reads")
 
     args = ap.parse_args()
     return {
