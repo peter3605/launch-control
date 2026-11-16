@@ -17,6 +17,25 @@ enforces it; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
+## 0.10.0 — 2026-11-15
+
+**`/lc:next` reads only this project's Ready stories.** (LC-28)
+
+- **Every project gets a second view of its own, `next`**: Project is this one,
+  Status is `Ready`, Agent can do this is checked, sorted by `Seq`. `/lc:next` reads
+  it in view mode instead of the shared `ready` view, which holds every project's
+  Ready rows. On a board with six projects one read of `ready` was 30 rows and about
+  120 KB, past the tool's output limit.
+- **`/lc:init` and `/lc:plan` create it beside the road view**, `init.py views --next`
+  prints its `configure` line, `init.py check` verifies it, and `plan.py config`
+  requires `--next` and never copies a sibling project's.
+- **New config key `views.next`.** `/lc:doctor` FAILs a config without it, naming the
+  view to create and its `configure` line, and FAILs a `next` view holding another
+  project's stories or stories that are not Ready. An empty one is fine. Until a
+  board from before 0.10.0 has it, `/lc:next` falls back to reading the road.
+- `/lc:mine` still reads `yourTurn` across every project, on purpose: a clock in one
+  project can block another. See `docs/notion-schema.md`.
+
 ## 0.9.1 — 2026-11-15
 
 **A view's repair line now removes a filter the view should not have.** (LC-B14)

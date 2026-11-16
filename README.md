@@ -213,7 +213,7 @@ and that page, not this one, is the current truth about the endpoint and the aut
 minutes — install the plugin, run `/lc:init`, watch it provision. From nothing,
 budget half an hour, and note that most of it is Notion-side account and connector
 setup that has nothing to do with this plugin. `/lc:init` itself is a few minutes of
-agent turns, because it creates two databases and seven views and then reads every one
+agent turns, because it creates two databases and eight views and then reads every one
 of them back to check it. Filing an actual backlog with `/lc:plan` is a separate
 session again, and a longer one — it reads your design doc or repo before it proposes
 anything.
@@ -419,7 +419,7 @@ properties that carry weight, and the views each command reads.
 
 | Command | What it does |
 |---|---|
-| `/lc:init [page]` | Creates the board from nothing — both databases, every property, all seven views — checks it against the schema, and puts this repo on it |
+| `/lc:init [page]` | Creates the board from nothing — both databases, every property, all eight views — checks it against the schema, and puts this repo on it |
 | `/lc:plan <doc or repo>` | Turns a design doc or a repo into a project and its whole backlog: provisions the project, checks every claim against the repo, adds the external clocks the doc never mentions, and files nothing until you confirm |
 | `/lc:next` | Hands you the next unblocked story this session can actually do, traps read out in full |
 | `/lc:start <ID>` | Binds the session to a story: status, branch, `.current-story` |
@@ -513,7 +513,7 @@ opening a PR. See [`docs/config-reference.md`](docs/config-reference.md).
 
 ## Status
 
-v0.9.1: pre-1.0, extracted from a working setup that manages five projects. The
+v0.10.0: pre-1.0, extracted from a working setup that manages five projects. The
 board is provisioned by `/lc:init`; projects on it are provisioned by `/lc:plan`.
 
 What this is *not* is a tracker for the steps inside a story. Keep those wherever

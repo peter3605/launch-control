@@ -56,7 +56,8 @@ def load_board():
 PROJECTS_DB, STORIES_DB = hx("projects-db"), hx("stories-db")
 PROJECTS_DS, STORIES_DS = dashed(hx("projects-ds")), dashed(hx("stories-ds"))
 PROJECT_PAGE = f"https://www.notion.so/{hx('project-row')}"
-VIEW_IDS = {k: hx(f"view-{k}") for k in SHARED + ("road",)}
+PER_PROJECT = ("road", "next")
+VIEW_IDS = {k: hx(f"view-{k}") for k in SHARED + PER_PROJECT}
 
 
 def state():
@@ -69,6 +70,7 @@ def state():
         "views": {k: f"https://www.notion.so/{STORIES_DB}?v={VIEW_IDS[k]}" for k in SHARED},
         "project": PROJECT_PAGE,
         "road": f"https://www.notion.so/{STORIES_DB}?v={VIEW_IDS['road']}",
+        "next": f"https://www.notion.so/{STORIES_DB}?v={VIEW_IDS['next']}",
     }
 
 
@@ -151,7 +153,7 @@ def write_fetch(path, obj, saved):
 class Board:
     """A fetch pair that matches board.json exactly; tests break it one thing at a time."""
 
-    def __init__(self, with_road=True):
+    def __init__(self, with_road=True, with_next=True):
         self.spec = load_board()
         ds = {"projects": PROJECTS_DS, "stories": STORIES_DS}
         self.projects_schema = schema_of(self.spec["projects"], ds)
@@ -160,6 +162,9 @@ class Board:
         if with_road:
             road = dict(self.spec["road"], name="Road — test")
             self.views[VIEW_IDS["road"]] = view_config(road, self.spec, PROJECT_PAGE)
+        if with_next:
+            nxt = dict(self.spec["next"], name="Next — test")
+            self.views[VIEW_IDS["next"]] = view_config(nxt, self.spec, PROJECT_PAGE)
 
     def write(self, tmp, saved=False, st=None):
         sp = os.path.join(tmp, "state.json")
@@ -269,6 +274,29 @@ class Views(unittest.TestCase):
         r = run(INIT, "views", "--road", "--key", "my-app")
         self.assertNotEqual(r.returncode, 0)
 
+    def test_next_view_is_this_projects_ready_agent_work(self):
+        """LC-28: /lc:next reads this view, so it must be scoped to the project as
+        well as to Ready and agent-doable - the shared ready view is every project's."""
+        r = run(INIT, "views", "--next", "--key", "my-app", "--project-url", PROJECT_PAGE)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        views = json.loads(r.stdout)
+        self.assertEqual([v["key"] for v in views], ["next"])
+        self.assertEqual(views[0]["name"], "Next — my-app")
+        self.assertEqual(views[0]["configure"].split("; ")[:3],
+                         [f'FILTER "Project" = "{PROJECT_PAGE}"', 'FILTER "Status" = "Ready"',
+                          'FILTER "Agent can do this" = TRUE'])
+        self.assertIn('SORT BY "Seq" ASC', views[0]["configure"])
+
+    def test_road_and_next_print_together(self):
+        r = run(INIT, "views", "--road", "--next", "--key", "my-app", "--project-url", PROJECT_PAGE)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual([v["key"] for v in json.loads(r.stdout)], ["road", "next"])
+
+    def test_next_view_needs_key_and_project_url(self):
+        r = run(INIT, "views", "--next", "--project-url", PROJECT_PAGE)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("--next", r.stderr)
+
 
 class Check(unittest.TestCase):
     def test_matching_board_passes_inline_and_saved(self):
@@ -371,6 +399,25 @@ class Check(unittest.TestCase):
         self.assertEqual(r.returncode, 1, r.stdout)
         self.assertEqual(len(fails(r)), 1)
         self.assertTrue(fails(r)[0].startswith("views.road"))
+
+    def test_next_filtered_to_another_project_is_named(self):
+        b = Board()
+        b.views[VIEW_IDS["next"]]["advancedFilter"]["filters"][0]["value"]["value"] = \
+            f"https://www.notion.so/{hx('another-project')}"
+        with tempfile.TemporaryDirectory() as tmp:
+            r = b.check(tmp)
+        self.assertEqual(r.returncode, 1, r.stdout)
+        self.assertEqual(len(fails(r)), 1, fails(r))
+        self.assertTrue(fails(r)[0].startswith("views.next"))
+        self.assertIn("init.py views --next", fails(r)[0])
+
+    def test_project_row_without_a_next_view_fails(self):
+        st = state()
+        del st["next"]
+        with tempfile.TemporaryDirectory() as tmp:
+            r = Board(with_next=False).check(tmp, st=st)
+        self.assertEqual(r.returncode, 1, r.stdout)
+        self.assertEqual(fails(r), ["the project row exists but its next view was never created"])
 
     def test_wrong_sort_and_missing_grouping_are_named(self):
         b = Board()
@@ -507,6 +554,8 @@ class RecordAndBoard(unittest.TestCase):
                                  "--data-source", f"collection://{STORIES_DS}").returncode, 0)
             self.assertEqual(run(INIT, "record", "--state", sp, "--key", "views.ready",
                                  "--url", f"view://{dashed(VIEW_IDS['ready'])}").returncode, 0)
+            self.assertEqual(run(INIT, "record", "--state", sp, "--key", "next",
+                                 "--url", f"view://{dashed(VIEW_IDS['next'])}").returncode, 0)
             with open(sp) as f:
                 st = json.load(f)
             with open(os.path.join(tmp, "lc-init", ".gitignore")) as f:
@@ -514,6 +563,7 @@ class RecordAndBoard(unittest.TestCase):
         self.assertEqual(st["stories"], {"database": f"https://www.notion.so/{STORIES_DB}",
                                          "dataSource": f"collection://{STORIES_DS}"})
         self.assertEqual(st["views"]["ready"], f"https://www.notion.so/{STORIES_DB}?v={VIEW_IDS['ready']}")
+        self.assertEqual(st["next"], f"https://www.notion.so/{STORIES_DB}?v={VIEW_IDS['next']}")
 
     def test_board_file_needs_every_shared_view(self):
         with tempfile.TemporaryDirectory() as tmp:

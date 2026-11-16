@@ -6,7 +6,7 @@ argument-hint: [empty Notion page URL] [--key <project key>] [--prefix <PREFIX>]
 
 Provision a Launch Control board from nothing, and put this repo on it as the first project.
 
-This creates the **board**: the Projects and Stories databases, every property in `docs/notion-schema.md`, and the six shared views. Then, as `/lc:plan` does for every later repo, it creates this repo's Projects row, its `road` view and `.claude/launch-control.json`. When it finishes, `/lc:groom` and `/lc:next` work with no visit to the Notion UI. A second repo joins the same board with `/lc:plan <doc or repo> --board <this repo>/.claude/launch-control.json`, not by running init again.
+This creates the **board**: the Projects and Stories databases, every property in `docs/notion-schema.md`, and the six shared views. Then, as `/lc:plan` does for every later repo, it creates this repo's Projects row, its `road` and `next` views and `.claude/launch-control.json`. When it finishes, `/lc:groom` and `/lc:next` work with no visit to the Notion UI. A second repo joins the same board with `/lc:plan <doc or repo> --board <this repo>/.claude/launch-control.json`, not by running init again.
 
 The deterministic parts live in `init.py` in this skill's base directory, and its exit code is the verdict, as with `doctor.py`. `board.json` beside it is the board: the DDL and view configs are generated from it, and `init.py check` compares what Notion reports back against the same file. Never hand-write DDL or a view filter - take them from `init.py` verbatim, so what is checked is what was asked for.
 
@@ -62,14 +62,14 @@ Stop at the first failure and say which check failed.
 ## 2. This repo's project
 
 11. **Projects row.** Create a page in the Projects data source: `Name` and `Key` = the key, `Repo` = the target's absolute path. Record: `init.py record --state STATE --key project --url <page URL>`.
-12. **Road view.** `init.py views --road --key <key> --project-url <project page URL>` prints one view; create it as in step 9 and record it with `--key road`. Query it in **view mode** (never SQL mode - SQL is billed): it must resolve and return **zero** rows. A row means the filter is wrong - stop.
-13. **Re-check the road.** Fetch the road view (`view://<id>`), save it as in step 10, and re-run `init.py check` with the same two database files plus `--view <road fetch>`. A database fetch taken before the road existed does not list it; the `--view` file fills that in, and the check now covers the road filter too.
-14. **Write the config.** `init.py board --state STATE --out <scratchpad>/lc-init-board.json`, then `python3 <base directory>/../plan/plan.py config --repo <target> --from <scratchpad>/lc-init-board.json --project <key> --prefix <PREFIX> --project-page <project page URL> --road <road URL>`. It writes every view key, stamps `installedVersion`, reads `baseBranch` from the remote, sets `autoMerge` false until the owner decides otherwise, and gitignores the local files.
+12. **Road and next views.** `init.py views --road --next --key <key> --project-url <project page URL>` prints this project's two views: `road`, every story in the project, and `next`, its Ready agent-doable stories, which is what `/lc:next` reads. Create each as in step 9 and record them with `--key road` and `--key next`. Query each in **view mode** (never SQL mode - SQL is billed): both must resolve and return **zero** rows. A row means the filter is wrong - stop.
+13. **Re-check them.** Fetch the road view and the next view (`view://<id>`), save each as in step 10, and re-run `init.py check` with the same two database files plus `--view <road fetch> --view <next fetch>`. A database fetch taken before they existed does not list them; the `--view` files fill that in, and the check now covers both filters.
+14. **Write the config.** `init.py board --state STATE --out <scratchpad>/lc-init-board.json`, then `python3 <base directory>/../plan/plan.py config --repo <target> --from <scratchpad>/lc-init-board.json --project <key> --prefix <PREFIX> --project-page <project page URL> --road <road URL> --next <next URL>`. It writes every view key, stamps `installedVersion`, reads `baseBranch` from the remote, sets `autoMerge` false until the owner decides otherwise, and gitignores the local files.
 15. Run `python3 <base directory>/../doctor/doctor.py --repo <target> --local-only`. The one failure to expect is a repo with no reachable `origin`: say so, and that `git.baseBranch` needs checking before the first `/lc:done`. A full `/lc:doctor` fails on an empty road by design until the first story is filed.
 
 ## 3. Report
 
-- The hub page, both databases and all seven views, as links.
+- The hub page, both databases and all eight views, as links.
 - `init.py check`'s last line, as printed.
 - The config path, and whether to commit it: yes for a private repo, so a fresh clone works (the hooks silently do nothing without it); no for a public one, where the board's IDs should stay out of history.
 - What comes next: `/lc:plan <design doc or this repo>` to file the whole backlog, or `/lc:groom <item>` for one story. Another repo joins this board with `/lc:plan <doc or repo> --board <target>/.claude/launch-control.json`.
@@ -81,4 +81,4 @@ If `STATE` exists, an earlier run stopped part way. Do not start over - that is 
 
 - Read `STATE` and tell the user what the earlier run got through.
 - For every key present, fetch the object and confirm it still exists (a database or page that was deleted in the UI means asking the user, not recreating silently). Skip creating it.
-- Continue from the first step whose key is missing: `hub` 5, `projects` 6, `stories` 7, `blockedBy` 8, any missing `views.*` 9, then the check in 10; `project` 11, `road` 12; a config already written for this project is reported as such by `plan.py config`.
+- Continue from the first step whose key is missing: `hub` 5, `projects` 6, `stories` 7, `blockedBy` 8, any missing `views.*` 9, then the check in 10; `project` 11, `road` or `next` 12; a config already written for this project is reported as such by `plan.py config`.

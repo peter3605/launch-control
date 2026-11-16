@@ -50,7 +50,7 @@ Stop at the first failure and say which check failed. Nothing has been written y
     List stories in the order they should run; Seq follows that order, moved only as far as needed to put blockers first.
 11. **Write the proposal** to `<scratchpad>/lc-plan/proposal.json` in the format in `plan.py`'s docstring, and run `python3 <base directory>/plan.py lint <proposal> --repo <target> --source <source file> --epics "<the board's Epic options, comma-separated>"`. Fix every FAIL and re-run until it exits 0. Read the warnings; each one is a question you should be able to answer.
 12. **Present it for review** - in this order:
-    - What will be provisioned: the Projects row (name, key), the road view name, the config path, and the board it goes on.
+    - What will be provisioned: the Projects row (name, key), the road and next view names, the config path, and the board it goes on.
     - **Claims checked**: claim, verdict, evidence. This table is how the user sees the document was not taken on trust.
     - **The backlog**, one table: draft ID, proposed Story ID series (`TP-nn` or `TP-Bn` - say the real numbers are assigned at filing), Name, Type, Estimate, Gating, Agent can do this, Lead time, Lead days, Blocked by, Done when. Do not abbreviate Done when.
     - External clocks filed and declined, with the reasons.
@@ -67,7 +67,9 @@ Do these in order. If a step fails, stop: say exactly what now exists (with URLs
 15. **Create the road view** on the Stories database (`database_id` = the Stories database, `data_source_id` = its data source), type `table`, named `Road — <key>`, configured:
     `FILTER "Project" = "<project page URL>"; SORT BY "Seq" ASC; SHOW "Name", "Story ID", "Status", "Type", "Seq", "Estimate", "Gating", "Agent can do this", "Done when"`.
     Build its URL as `https://www.notion.so/<stories database id, no dashes>?v=<view id, no dashes>`. Fetch the view and confirm its filter is Project contains this project's page, then query it in view mode: it must resolve and return **zero** rows. A row here means the filter is wrong - stop. Record it: `plan.py record --state <state> --draft _road --url <road URL>`.
-16. **Write the config**: `python3 <base directory>/plan.py config --repo <target> --from <the board's launch-control.json> --project <key> --prefix <PREFIX> --project-page <project URL> --road <road URL>`. It refuses to overwrite another project's config, copies the shared views, sets `autoMerge` false until the owner decides otherwise, and adds the local files to `.gitignore`.
+
+    Then **create the next view** the same way - this project's Ready, agent-doable stories, which is what `/lc:next` reads - named `Next — <key>`, with the `configure` line `python3 <base directory>/../init/init.py views --next --key <key> --project-url <project page URL>` prints. Fetch it, confirm its filter, query it (zero rows), and record it with `--draft _next`.
+16. **Write the config**: `python3 <base directory>/plan.py config --repo <target> --from <the board's launch-control.json> --project <key> --prefix <PREFIX> --project-page <project URL> --road <road URL> --next <next URL>`. It refuses to overwrite another project's config, copies the shared views, sets `autoMerge` false until the owner decides otherwise, and adds the local files to `.gitignore`.
 17. Run `python3 <base directory>/../doctor/doctor.py --repo <target> --local-only`. The one failure to expect is a repo with no reachable `origin`: say so, and that `git.baseBranch` needs checking before the first `/lc:done`. Anything else, stop and report it.
 
 ## 3. File - one story at a time
@@ -86,7 +88,7 @@ Do these in order. If a step fails, stop: say exactly what now exists (with URLs
 
 ## 4. Report
 
-- The Projects row, the road view, and the config path.
+- The Projects row, the road and next views, and the config path.
 - Every story filed: Story ID, name, Status, Agent can do this, Gating, Lead time, Lead days.
 - Claims that turned out false, in one line each - that is where the document was wrong.
 - **The first story `/lc:next` returns** in that repo (lowest Seq, Ready, agent-doable) and **what `/lc:mine` leads with** (the item `/lc:mine` names under Start today, now that the rows are filed). Name the clock to start today.
@@ -101,6 +103,7 @@ If `<target>/.claude/lc-plan/state.json` exists, an earlier run stopped part way
 - Skip step 6: the key and prefix are taken by this run's own Projects row and stories, which is expected. Do re-run the rest of pre-flight.
 - `_project` present: fetch it; it must still exist. Otherwise continue from step 14.
 - `_road` present: query it; it must resolve and hold only this prefix. Otherwise continue from step 15.
+- `_next` present: query it; it must resolve and hold only this prefix. Otherwise create it (the second half of step 15).
 - Config present and `plan.py config` reports it already written: continue. Otherwise step 16.
 - Then step 18 onward: `order` skips every draft already filed.
 

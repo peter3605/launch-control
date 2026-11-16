@@ -31,29 +31,30 @@ def config():
         "projectPageId": hx("project-row"),
         "stories": st["stories"],
         "projects": st["projects"],
-        "views": dict(st["views"], road=st["road"]),
+        "views": dict(st["views"], road=st["road"], next=st["next"]),
         "git": {"enabled": False},
     }
 
 
-def views_file(tmp):
+def views_file(tmp, nxt=None):
     """Every view resolves; the road holds this project's stories alone."""
     results = {k: {"rows": [], "hasMore": False} for k in VIEW_IDS}
     results["road"] = {"rows": [["APP-1", "Ready"], ["APP-2", "Done"]], "hasMore": False}
+    results["next"] = {"rows": nxt if nxt is not None else [["APP-1", "Ready"]], "hasMore": False}
     path = os.path.join(tmp, "views.json")
     with open(path, "w") as f:
         json.dump(results, f)
     return path
 
 
-def doctor(board, tmp, saved=False, cfg=None, schema=True):
+def doctor(board, tmp, saved=False, cfg=None, schema=True, nxt=None):
     repo = os.path.join(tmp, "repo")
     os.makedirs(os.path.join(repo, ".claude"), exist_ok=True)
     with open(os.path.join(repo, ".claude", "launch-control.json"), "w") as f:
         json.dump(cfg if cfg is not None else config(), f)
     _, stories, projects = board.write(tmp, saved)
     extra = ("--stories", stories, "--projects", projects) if schema else ()
-    return subprocess.run([sys.executable, "-B", DOCTOR, "--repo", repo, "--views", views_file(tmp), *extra],
+    return subprocess.run([sys.executable, "-B", DOCTOR, "--repo", repo, "--views", views_file(tmp, nxt), *extra],
                           capture_output=True, text=True, timeout=60)
 
 
@@ -198,6 +199,52 @@ class BoardSchema(unittest.TestCase):
                                capture_output=True, text=True, timeout=60)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn("skip  properties and view filters", r.stdout)
+
+    def test_next_filtered_to_another_project_is_named(self):
+        """LC-28: next is what /lc:next reads. Scoped to the wrong project, it hands out
+        another repo's work - or, scoped to none, every project's, the overflow LC-28 fixed."""
+        with tempfile.TemporaryDirectory() as tmp:
+            b = Board()
+            b.views[VIEW_IDS["next"]]["advancedFilter"]["filters"].pop(0)
+            r = doctor(b, tmp)
+        self.assertEqual(r.returncode, 1, r.stdout)
+        f = fails(r)
+        self.assertEqual(len(f), 1, f)
+        self.assertTrue(f[0].startswith("views.next ('Next — test'): filter is"), f[0])
+        self.assertIn(f'configure it as `FILTER "Project" = "{PROJECT_PAGE}"; FILTER "Status" = "Ready"', f[0])
+        self.assertIn("views --next --key my-app", f[0])
+
+    def test_config_without_next_fails_with_the_migration(self):
+        """A board provisioned before 0.10.0 has no next view. That is a FAIL that says
+        exactly what to create, not a silent pass on the shared ready view."""
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = config()
+            del cfg["views"]["next"]
+            r = doctor(Board(with_next=False), tmp, cfg=cfg)
+        self.assertEqual(r.returncode, 1, r.stdout)
+        f = fails(r)
+        self.assertEqual(len(f), 1, f)
+        self.assertTrue(f[0].startswith("views.next is missing - a board provisioned before 0.10.0"), f[0])
+        self.assertIn("named 'Next — my-app'", f[0])
+        self.assertIn(f'`FILTER "Project" = "{PROJECT_PAGE}"; FILTER "Status" = "Ready"; '
+                      'FILTER "Agent can do this" = TRUE; SORT BY "Seq" ASC', f[0])
+        self.assertIn("add its URL to views.next", f[0])
+        self.assertNotIn("all eight view keys present", r.stdout)
+
+    def test_next_rows_from_another_project_or_not_ready_fail(self):
+        for rows, needle in (([["APP-1", "Ready"], ["OTH-3", "Ready"]], "outside APP-: OTH-3"),
+                             ([["APP-1", "Backlog"]], "not Ready: APP-1")):
+            with self.subTest(needle=needle), tempfile.TemporaryDirectory() as tmp:
+                r = doctor(Board(), tmp, nxt=rows)
+                self.assertEqual(r.returncode, 1, r.stdout)
+                self.assertTrue(any(needle in x and x.startswith("views.next returned") for x in fails(r)), fails(r))
+
+    def test_an_empty_next_is_not_a_failure(self):
+        """Unlike the road, nothing Ready is an ordinary state, not a scoping bug."""
+        with tempfile.TemporaryDirectory() as tmp:
+            r = doctor(Board(), tmp, nxt=[])
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertIn("views.next resolves (0 rows, all APP- and Ready)", r.stdout)
 
     def test_fixture_road_filters_on_the_configured_project(self):
         """Guard on the fixture itself: the road view test_init builds filters on the

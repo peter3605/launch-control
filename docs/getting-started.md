@@ -162,7 +162,7 @@ In the repo you want tracked, inside Claude Code:
 
 It creates **two Notion databases** — Projects and Stories — every property the
 commands read, and six shared views, then this repo's Projects row, its own `road`
-view, and `.claude/launch-control.json`. It shows you the plan and **writes nothing
+and `next` views, and `.claude/launch-control.json`. It shows you the plan and **writes nothing
 to Notion or to the repo until you confirm.**
 
 Then it reads back everything it created and compares it against the schema, so a
@@ -179,7 +179,7 @@ repo:
 /lc:plan <design doc or repo path> --board <first repo>/.claude/launch-control.json
 ```
 
-That creates the project, its road view and config on the **existing** board, and
+That creates the project, its road and next views and config on the **existing** board, and
 files a backlog from your design doc or from the repo itself.
 
 ### Check it
@@ -194,7 +194,7 @@ A clean local run looks like this:
 Launch Control doctor -> /Users/you/repos/my-app
 
 Views in config
-  ok    all seven view keys present
+  ok    all eight view keys present
 
 Git
   ok    git.baseBranch 'main' matches the default branch (remote)
@@ -202,6 +202,7 @@ Git
 Board
   ok    views.ready resolves (3 rows)
   ok    views.road resolves, 12 rows, all APP-
+  ok    views.next resolves (2 rows, all APP- and Ready)
 
 Standing notices
   ok    no notice names a finished story
@@ -214,7 +215,7 @@ with two deliberate faults in it:
 
 ```
 Views in config
-  ok    all seven view keys present
+  ok    all eight view keys present
   FAIL  views.road has no ?v= view id - it opens the database, not a view
 
 Git

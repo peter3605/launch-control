@@ -88,11 +88,21 @@ def repair(v):
     return line
 
 
-def road_spec(key, project_url, s=None):
-    r = json.loads(json.dumps((s or spec())["road"]))
+# The views each project gets for itself, filtered on its own Projects row. `road`
+# is every story in the project; `next` is its Ready, agent-doable ones, which is
+# what /lc:next reads.
+PROJECT_VIEWS = ("road", "next")
+
+
+def project_view_spec(which, key, project_url, s=None):
+    r = json.loads(json.dumps((s or spec())[which]))
     r["name"] = r["name"].format(key=key)
     r["filters"] = [[p, o, v.format(project_url=project_url) if isinstance(v, str) else v] for p, o, v in r["filters"]]
     return r
+
+
+def road_spec(key, project_url, s=None):
+    return project_view_spec("road", key, project_url, s)
 
 
 # ----------------------------------------------------------- fetch results
