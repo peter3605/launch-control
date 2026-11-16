@@ -99,6 +99,20 @@ version that reaches `main` is tagged and released, in this order:
 4. **Check:** `git ls-remote --tags origin "v$V"` prints a line, and
    `gh release view "v$V"` exits 0.
 
+**CI checks that it happened.** The `release-tag` job in
+`.github/workflows/test.yml` runs `python3 tests/check_release_tag.py` on every push
+to `main`, daily at 14:00 UTC, and on demand (`workflow_dispatch`). It fails when
+the version in `plugin.json` has no `v<version>` tag, when that tag is lightweight
+rather than annotated, or when it points at a commit carrying another version. It
+never runs on a pull request, because the bump PR cannot have its tag yet. On the
+push that merges a bump, the new version passes with a reminder. The next push to
+`main`, or the next daily run, fails until it is tagged.
+
+When it fails, do steps 2 and 3 above for the version it names, then re-run the
+failed job. `UNTAGGED RELEASE` means cut the tag. If it says the checkout has no
+tags at all, the workflow's `fetch-depth: 0` was lost. For `LIGHTWEIGHT TAG` or
+`MISPLACED TAG`, a tag was already pushed, so ask Peter before replacing it.
+
 **Who:** Peter, or a session he has told to. The tag and the release are public,
 so a session confirms with him before pushing either. Versions 0.1.0 to 0.9.0 were
 backfilled on 2026-11-15, each tag on the last `main` commit carrying that version.

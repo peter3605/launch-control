@@ -8,6 +8,11 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Daily, for the release-tag job alone: a bump that merges with nothing on top
+  # of it would otherwise never be checked again. 14:00 UTC, after a day's work.
+  schedule:
+    - cron: "0 14 * * *"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -19,6 +24,7 @@ concurrency:
 
 jobs:
   unittest:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -38,3 +44,29 @@ jobs:
 
       - name: Run the suite
         run: python3 -B -m unittest discover -s tests -t . -v
+
+  # Is the version on main released? Decision 0002: every version that reaches
+  # main gets an annotated v<version> tag. 0.9.1 went out without one, on the
+  # procedure's first use. Never on a pull request: the tag is cut after merge,
+  # so a bump PR cannot have one, and this would make every bump red by design.
+  # On a push, a version new in that push passes with a reminder (--before); one
+  # that was already on main must be tagged. See CONTRIBUTING, "Cutting a release".
+  release-tag:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      # fetch-depth 0 brings every tag and the pre-push commit. The default
+      # checkout fetches no tags, and the check would fail on every run.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Released version is tagged
+        env:
+          BEFORE: ${{ github.event_name == 'push' && github.event.before || '' }}
+        run: |
+          if [ -n "$BEFORE" ]; then
+            python3 -B tests/check_release_tag.py --before "$BEFORE"
+          else
+            python3 -B tests/check_release_tag.py
+          fi
