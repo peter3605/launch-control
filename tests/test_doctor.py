@@ -11,6 +11,7 @@ shape, not two that could disagree.
 """
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -36,26 +37,91 @@ def config():
     }
 
 
-def views_file(tmp, nxt=None):
+def views_file(tmp, nxt=None, override=None):
     """Every view resolves; the road holds this project's stories alone."""
-    results = {k: {"rows": [], "hasMore": False} for k in VIEW_IDS}
-    results["road"] = {"rows": [["APP-1", "Ready"], ["APP-2", "Done"]], "hasMore": False}
-    results["next"] = {"rows": nxt if nxt is not None else [["APP-1", "Ready"]], "hasMore": False}
+    results = {k: {"resolved": True} for k in VIEW_IDS}
+    results["road"] = {"count": 2, "rows": [["APP-1", "Ready"], ["APP-2", "Done"]], "hasMore": False}
+    nxt = nxt if nxt is not None else [["APP-1", "Ready"]]
+    results["next"] = {"count": len(nxt), "rows": nxt, "hasMore": False}
+    results.update(override or {})
     path = os.path.join(tmp, "views.json")
     with open(path, "w") as f:
         json.dump(results, f)
     return path
 
 
-def doctor(board, tmp, saved=False, cfg=None, schema=True, nxt=None):
+def doctor(board, tmp, saved=False, cfg=None, schema=True, nxt=None, override=None, blocks=False):
     repo = os.path.join(tmp, "repo")
     os.makedirs(os.path.join(repo, ".claude"), exist_ok=True)
     with open(os.path.join(repo, ".claude", "launch-control.json"), "w") as f:
         json.dump(cfg if cfg is not None else config(), f)
     _, stories, projects = board.write(tmp, saved)
+    if blocks:
+        stories, projects = blocks_only(stories, tmp, "stories"), blocks_only(projects, tmp, "projects")
     extra = ("--stories", stories, "--projects", projects) if schema else ()
-    return subprocess.run([sys.executable, "-B", DOCTOR, "--repo", repo, "--views", views_file(tmp, nxt), *extra],
+    return subprocess.run([sys.executable, "-B", DOCTOR, "--repo", repo, "--views", views_file(tmp, nxt, override), *extra],
                           capture_output=True, text=True, timeout=60)
+
+
+def blocks_only(fetch_path, tmp, name, cut=None):
+    """What /lc:doctor writes for a fetch that came back inline: its <data-source-state>
+    and <view> blocks as text, and nothing else (LC-B15). `cut` truncates the text."""
+    with open(fetch_path) as f:
+        text = json.load(f)["text"]
+    parts = re.findall(r"<data-source-state>.*?</data-source-state>|<view url=.*?</view>", text, re.S)
+    out = "\n".join(parts)
+    if cut is not None:
+        out = out[:cut]
+    path = os.path.join(tmp, f"{name}-blocks.txt")
+    with open(path, "w") as f:
+        f.write(out)
+    return path
+
+
+class InlineInput(unittest.TestCase):
+    """LC-B15: nothing inline is re-typed whole. Each short form is checked loudly."""
+
+    def test_blocks_only_fetches_pass_like_the_whole_result(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            r = doctor(Board(), tmp, blocks=True)
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertIn("views.next ('Next — test'): filter, sort as specified", r.stdout)
+
+    def test_truncated_blocks_fail_loudly(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _, stories, _ = Board().write(tmp)
+            with open(blocks_only(stories, tmp, "s")) as f:
+                whole = f.read()
+            for cut, needle in ((len(whole) - 20, "opened but"), (200, "<data-source-state>")):
+                with self.subTest(cut=cut):
+                    path = blocks_only(stories, tmp, "s", cut=cut)
+                    proj = blocks_only(Board().write(tmp)[2], tmp, "p")
+                    repo = os.path.join(tmp, "repo")
+                    os.makedirs(os.path.join(repo, ".claude"), exist_ok=True)
+                    with open(os.path.join(repo, ".claude", "launch-control.json"), "w") as f:
+                        json.dump(config(), f)
+                    r = subprocess.run([sys.executable, "-B", DOCTOR, "--repo", repo, "--views", views_file(tmp),
+                                        "--stories", path, "--projects", proj], capture_output=True, text=True)
+                    self.assertEqual(r.returncode, 1, r.stdout)
+                    self.assertTrue(any(x.startswith("stories: could not read the fetch result") and needle in x
+                                        for x in fails(r)), fails(r))
+
+    def test_inline_road_without_a_count_or_with_the_wrong_one_fails(self):
+        cases = (({"rows": [["APP-1", "Ready"]], "hasMore": False}, "needs `count`"),
+                 ({"count": 3, "rows": [["APP-1", "Ready"], ["APP-2", "Done"]], "hasMore": False}, "count 3 but gives 2"),
+                 ({"count": 1, "rows": [["APP-1", "Ready"]]}, "needs `hasMore`"))
+        for page, needle in cases:
+            with self.subTest(needle=needle), tempfile.TemporaryDirectory() as tmp:
+                r = doctor(Board(), tmp, override={"road": page})
+                self.assertEqual(r.returncode, 1, r.stdout)
+                self.assertTrue(any(x.startswith("views.road did not resolve") and needle in x for x in fails(r)), fails(r))
+
+    def test_resolved_cannot_stand_in_for_road_or_next(self):
+        for k in ("road", "next"):
+            with self.subTest(k=k), tempfile.TemporaryDirectory() as tmp:
+                r = doctor(Board(), tmp, override={k: {"resolved": True}})
+                self.assertEqual(r.returncode, 1, r.stdout)
+                self.assertTrue(any(x.startswith(f"views.{k} was given as") for x in fails(r)), fails(r))
 
 
 class BoardSchema(unittest.TestCase):

@@ -308,6 +308,30 @@ class Check(unittest.TestCase):
                 self.assertIn("views.road", r.stdout)
                 self.assertTrue(r.stdout.rstrip().endswith("Clean."))
 
+    def test_an_inline_fetch_given_as_its_blocks_alone_passes(self):
+        """LC-B15: only <data-source-state> and <view> are read, so they are all an
+        inline fetch needs to be - and a block cut short fails rather than vanishing."""
+        import re
+        with tempfile.TemporaryDirectory() as tmp:
+            sp, stories, projects = Board().write(tmp)
+            paths = []
+            for src in (stories, projects):
+                with open(src) as f:
+                    text = json.load(f)["text"]
+                path = src + ".blocks.txt"
+                with open(path, "w") as f:
+                    f.write("\n".join(re.findall(r"<data-source-state>.*?</data-source-state>|<view url=.*?</view>", text, re.S)))
+                paths.append(path)
+            r = run(INIT, "check", "--state", sp, "--stories", paths[0], "--projects", paths[1])
+            self.assertEqual(r.returncode, 0, r.stdout)
+            with open(paths[0]) as f:
+                cut = f.read()[:-30]
+            with open(paths[0], "w") as f:
+                f.write(cut)
+            r = run(INIT, "check", "--state", sp, "--stories", paths[0], "--projects", paths[1])
+            self.assertEqual(r.returncode, 1, r.stdout)
+            self.assertTrue(any("opened but" in x for x in fails(r)), fails(r))
+
     def test_missing_property_is_named(self):
         for saved in (False, True):
             with self.subTest(saved=saved), tempfile.TemporaryDirectory() as tmp:

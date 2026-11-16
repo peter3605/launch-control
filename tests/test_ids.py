@@ -190,5 +190,49 @@ class BadInput(Base):
         self.assertIn("not a view-mode result", out)
 
 
+class InlinePage(Base):
+    """LC-B15: a page under the tool's size limit comes back inline, not on disk. It
+    is given as --row values with a stated count, never re-typed into a file."""
+
+    def test_dependents_from_saved_pages_plus_an_inline_last_page(self):
+        p = self.page([row("AB-1", "Done"), row("AB-2", "Backlog", blocked=["AB-1"])], has_more=True, saved=True)
+        code, out = self.run_ids("dependents", p, "--url", url("AB-1"),
+                                 "--inline-page", "2", "false",
+                                 "--row", "CD-5", "Backlog", url("CD-5"), f"{url('ZZ-1')},{url('AB-1')}",
+                                 "--row", "AB-3", "Ready", url("AB-3"), "-")
+        self.assertEqual(code, 0, out)
+        self.assertEqual([l.split("\t")[0] for l in out.strip().splitlines()], ["AB-2", "CD-5"])
+
+    def test_a_whole_read_inline_needs_no_files(self):
+        code, out = self.run_ids("find", "--id", "AB-3", "--inline-page", "1", "false",
+                                 "--row", "AB-3", "In Progress", url("AB-3"), "-")
+        self.assertEqual(code, 0, out)
+        self.assertTrue(out.startswith("AB-3\tIn Progress\t"), out)
+
+    def test_an_inline_page_saying_has_more_is_an_incomplete_read(self):
+        code, out = self.run_ids("dependents", "--url", url("AB-1"), "--inline-page", "1", "true",
+                                 "--row", "AB-2", "Backlog", url("AB-2"), url("AB-1"))
+        self.assertEqual(code, 1)
+        self.assertIn("not read to the end", out)
+
+    def test_malformed_inline_rows_fail_loudly(self):
+        cases = [
+            (["--inline-page", "2", "false", "--row", "AB-2", "Backlog", url("AB-2"), "-"], "says 2 row(s) but 1"),
+            (["--inline-page", "1", "false", "--row", "AB-2", "Backlog", "not-a-url", "-"], "no Notion page id in URL"),
+            (["--inline-page", "1", "false", "--row", "AB-2", "Backlog", url("AB-2"), "AB-1"], "blocker 'AB-1'"),
+            (["--inline-page", "1", "false", "--row", "AB-2", "Blocked by", url("AB-2"), "-"], "status 'Blocked by'"),
+            (["--inline-page", "1", "no", "--row", "AB-2", "Backlog", url("AB-2"), "-"], "true or false"),
+            (["--inline-page", "one", "false"], "whole number"),
+            (["--row", "AB-2", "Backlog", url("AB-2"), "-"], "without --inline-page"),
+            ([], "no pages"),
+        ]
+        for argv, needle in cases:
+            with self.subTest(needle=needle):
+                code, out = self.run_ids("dependents", "--url", url("AB-1"), *argv)
+                self.assertEqual(code, 1, out)
+                self.assertIn(needle, out)
+                self.assertTrue(out.startswith("FAIL"), out)
+
+
 if __name__ == "__main__":
     unittest.main()

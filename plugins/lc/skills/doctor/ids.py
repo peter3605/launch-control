@@ -21,6 +21,19 @@ pages in the order they were read. The last one must say has_more false: an
 answer from a view that was not read to the end is refused, because the row that
 would have changed it is exactly the one that was not read.
 
+A page that came back inline - under the tool's size limit, so it was never saved
+to disk - is not re-typed into a file. Give its rows on the command line instead,
+as short values that can be stated exactly, and say how many rows it held:
+
+    --inline-page COUNT HAS_MORE   the inline page: its row count, and its has_more
+    --row ID STATUS URL BLOCKERS   one per row of it, in order; BLOCKERS is the
+                                   Blocked by URLs comma-separated, or - for none
+
+The inline page is read after every PAGE file, so it is the last page. It is
+checked loudly: a --row count that differs from COUNT, a URL with no page id, a
+blocker that is not a Notion URL or a HAS_MORE that is not true/false is a FAIL,
+never an answer. The whole read may be inline, with no PAGE files at all.
+
 Exit codes: 0 answered; 1 a failure or a negative answer (not found, taken, no
 next ID because the read was incomplete); 2 a Story ID on more than one row.
 """
@@ -104,6 +117,37 @@ def read_rows(paths):
     return rows, complete
 
 
+STATUSES = {"Backlog", "Ready", "In Progress", "Blocked", "In Review", "Done"}
+
+
+def inline_rows(count, has_more, given):
+    """The inline page's rows from --inline-page and --row, validated. Each check is
+    one way a stated row goes wrong: a dropped or extra row, a mangled URL, a
+    blocker list that lost its separators, a status misread."""
+    try:
+        n = int(count)
+    except ValueError:
+        raise PageError(f"--inline-page COUNT must be a whole number, not {count!r}") from None
+    if has_more not in ("true", "false"):
+        raise PageError(f"--inline-page HAS_MORE must be true or false, not {has_more!r}")
+    if len(given) != n:
+        raise PageError(f"--inline-page says {n} row(s) but {len(given)} --row given - "
+                        f"a dropped row is a wrong answer, so state every row of the inline page")
+    rows = []
+    for sid, status, url, blockers in given:
+        if not page_id(url):
+            raise PageError(f"--row {sid}: no Notion page id in URL {url!r}")
+        if status not in STATUSES:
+            raise PageError(f"--row {sid}: status {status!r} is not one of {', '.join(sorted(STATUSES))}")
+        urls = [] if blockers == "-" else [b.strip() for b in blockers.split(",")]
+        bad = [b for b in urls if not page_id(b)]
+        if bad:
+            raise PageError(f"--row {sid}: blocker {bad[0]!r} has no Notion page id "
+                            f"(BLOCKERS is comma-separated URLs, or - for none)")
+        rows.append({"id": sid if sid != "-" else "", "status": status, "url": url, "blockedBy": urls})
+    return rows, has_more == "false"
+
+
 def need_complete(complete, what):
     if not complete:
         print(f"FAIL  the view was not read to the end (the last page says has_more) - "
@@ -179,7 +223,11 @@ def main(argv=None):
     sub = ap.add_subparsers(dest="cmd", required=True)
     for name in ("list", "find", "next", "dependents", "prefix-free"):
         p = sub.add_parser(name)
-        p.add_argument("pages", nargs="+", metavar="PAGE")
+        p.add_argument("pages", nargs="*", metavar="PAGE")
+        p.add_argument("--inline-page", nargs=2, metavar=("COUNT", "HAS_MORE"),
+                       help="the last page came back inline: its row count and has_more")
+        p.add_argument("--row", nargs=4, action="append", default=[], metavar=("ID", "STATUS", "URL", "BLOCKERS"),
+                       help="one row of the inline page; BLOCKERS comma-separated URLs or -")
         if name == "find":
             p.add_argument("--id", required=True)
         if name in ("next", "prefix-free"):
@@ -190,7 +238,14 @@ def main(argv=None):
             p.add_argument("--url", required=True)
     args = ap.parse_args(argv)
     try:
-        rows, args.complete = read_rows(args.pages)
+        if args.row and not args.inline_page:
+            raise PageError("--row given without --inline-page COUNT HAS_MORE")
+        if not args.pages and not args.inline_page:
+            raise PageError("no pages - pass the saved view pages, an --inline-page, or both")
+        rows, args.complete = read_rows(args.pages) if args.pages else ([], True)
+        if args.inline_page:
+            more, args.complete = inline_rows(*args.inline_page, args.row)
+            rows += more
     except PageError as e:
         print(f"FAIL  {e}")
         return 1

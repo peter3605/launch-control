@@ -17,6 +17,31 @@ enforces it; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
+## 0.11.0 — 2026-11-15
+
+**No command asks for an inline Notion result to be re-typed into a file.** (LC-B15)
+
+- **Why.** The tool saves a result to disk only when it is over the client's output
+  limit. Under it, the result comes back inline, and `/lc:doctor` and `/lc:done` told
+  the model to write it out "verbatim". In practice a 15 KB database fetch got
+  trimmed, and the last page of a board read had to be hand-copied for `ids.py`. A
+  mistyped value there can mean a false Clean or a missed promotion.
+- **`ids.py` takes an inline page on the command line**:
+  `--inline-page COUNT HAS_MORE` plus one `--row ID STATUS URL BLOCKERS` per row.
+  These are short values that can be stated exactly. A count mismatch, a URL with no
+  page id, a malformed blocker list, an unknown status or a bad `HAS_MORE` is a FAIL.
+  `/lc:done`, `/lc:reconcile`, `/lc:start` and `/lc:groom` use it.
+- **`doctor.py` views file**: `{"resolved": true}` for a shared view that is only
+  checked to resolve, so nothing of it is copied. An inline `road` or `next` page must
+  carry `count`, which is checked against its rows, and an explicit `hasMore`. The
+  old count-less `rows` form is refused. `plan.py`'s board file uses the same form.
+- **Database fetches**: an inline fetch is given as a text file with only its
+  `<data-source-state>` and `<view>` blocks, the only parts read. The parser now
+  fails on a view block that is opened but not closed, a block that does not parse,
+  or a data-source state with no `schema` or `url`, where before a truncated copy
+  could read as a board with one view fewer.
+- `docs/troubleshooting.md` has a table of every input and its inline form.
+
 ## 0.10.0 — 2026-11-15
 
 **`/lc:next` reads only this project's Ready stories.** (LC-28)

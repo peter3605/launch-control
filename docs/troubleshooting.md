@@ -334,6 +334,26 @@ as fast as which failed.
 
 ---
 
+## When a Notion result comes back inline
+
+The tool saves a Notion result to disk only when it is over the client's output
+limit, and that limit differs between Claude Code versions and hosts. Under it, the
+result comes back inline in the conversation, and the scripts cannot read the
+conversation. No command asks for an inline result to be re-typed whole into a file,
+because a hand copy of 15 KB gets trimmed, and a mistyped value can produce a false
+Clean. Instead, each input has a short form that can be stated exactly and is checked
+loudly (LC-B15):
+
+| Input | Read by | Inline form |
+|---|---|---|
+| A page of a view (`board`, `road`) for an ID lookup or dependents | `ids.py` (`/lc:done`, `/lc:reconcile`, `/lc:start`, `/lc:groom`) | `--inline-page COUNT HAS_MORE` plus one `--row ID STATUS URL BLOCKERS` per row. A count that differs from the rows, a URL with no page id or a malformed blocker list is a FAIL. |
+| A shared view's page, only checked to resolve | `doctor.py` | `{"resolved": true}`: nothing is copied. |
+| A `road` or `next` page | `doctor.py`, `plan.py` | `{"count": N, "rows": [[ID, Status], ...], "hasMore": bool}`. `count` must match. |
+| The Stories or Projects database fetch | `doctor.py`, `init.py check` | A text file with only the `<data-source-state>` and `<view>` blocks, copied exactly. A block that is opened but not closed, or does not parse, is a FAIL. |
+
+Do not try to force results onto disk by changing `page_size`. Whether a result is
+saved depends on the client, not on the plugin.
+
 ## Setup and migration scripts
 
 **`install.sh` prints a message and exits 2.** That is correct and deliberate. It

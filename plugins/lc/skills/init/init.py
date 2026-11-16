@@ -25,9 +25,11 @@ STATE is this run's ledger ({"hub", "projects", "stories", "blockedBy", "views":
 a second board, and it lives in .claude/lc-init/, which ignores itself: it holds
 Notion IDs, and in a public repo those stay out of history.
 
-FILE for `check` is a Notion fetch result for the database - saved to disk by the
-tool when large, or written verbatim from an inline result. The data-source schema
-and every view's configuration are parsed out of it. A --view FILE is a fetch of one
+FILE for `check` is a Notion fetch result for the database - the file the tool
+saved when it was large, or, for one that came back inline, a text file holding
+only its <data-source-state> and <view> blocks (the only parts read; a block cut
+short fails loudly). The data-source schema and every view's configuration are
+parsed out of it. A --view FILE is a fetch of one
 view, and overrides that view's entry - so a view fixed or added after the database
 fetch can be re-checked without fetching the whole database again.
 """

@@ -13,10 +13,19 @@ or a list of pages in order, and each page is one of:
 
     {"error": "<what the query said>"}         the view did not resolve
     {"file": "<path>"}                         a saved raw view-mode result
-    {"rows": [["APP-1", "Done"], ...], "hasMore": false}   Story ID and Status
+    {"resolved": true}                         an inline result for a shared view,
+                                               whose rows are never inspected
+    {"count": 2, "rows": [["APP-1", "Done"], ...], "hasMore": false}
+                                               an inline road or next page: how many
+                                               rows it held, and each one's Story ID
+                                               and Status, stated rather than re-typed
 
---stories and --projects are fetch results for the two databases, inline or saved
-to disk, in the form `init.py check` reads. They hold each data source's schema and
+`count` is checked against `rows`, so a dropped row is a FAIL, not a quiet pass.
+
+--stories and --projects are fetch results for the two databases in the form
+`init.py check` reads: the file the tool saved, or - for a result that came back
+inline - a text file holding only its <data-source-state> block and its <view>
+blocks, the only parts read. They hold each data source's schema and
 every view's configuration, which are compared with init/board.json by the same
 code `init.py check` uses (boardcheck.py). When the plugin's board.json moves on, an
 existing board does not, and this is where that shows up as a named failure.
@@ -183,12 +192,23 @@ def read_page(page, base):
             return None, False, f"saved view result has a row that is not an object: {path}"
         rows = [(str(r.get("Story ID") or ""), str(r.get("Status") or "")) for r in rows]
         return rows, bool(raw.get("has_more")), None
+    if page.get("resolved") is True and len(page) == 1:
+        return [], False, None
     if "rows" in page:
         pairs = page["rows"]
         if not isinstance(pairs, list) or not all(
                 isinstance(p, (list, tuple)) and len(p) == 2 for p in pairs):
             return None, False, "`rows` must be a list of [story id, status] pairs"
-        return [(str(i or ""), str(s or "")) for i, s in pairs], bool(page.get("hasMore")), None
+        count = page.get("count")
+        if not isinstance(count, int) or isinstance(count, bool):
+            return None, False, ("an inline page needs `count`, the number of rows the result held - "
+                                 "without it a dropped row cannot be noticed")
+        if count != len(pairs):
+            return None, False, (f"inline page says count {count} but gives {len(pairs)} row(s) - "
+                                 f"state every row of the result")
+        if not isinstance(page.get("hasMore"), bool):
+            return None, False, "an inline page needs `hasMore`, true or false, as the result said"
+        return [(str(i or ""), str(s or "")) for i, s in pairs], page["hasMore"], None
     return None, False, f"unrecognised page entry {sorted(page)}"
 
 
@@ -368,6 +388,10 @@ def main():
                 rows += page_rows
             if error:
                 fail(f"views.{k} did not resolve: {error}")
+                continue
+            if k in ("road", "next") and any(isinstance(p, dict) and "resolved" in p for p in pages):
+                fail(f"views.{k} was given as {{\"resolved\": true}} - its rows are checked, so give "
+                     f"the saved file or an inline page's count and rows")
                 continue
             if k == "next":
                 # This project's alone, like the road, but it may well be empty: a
