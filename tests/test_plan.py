@@ -89,7 +89,7 @@ class Tmp(unittest.TestCase):
         return self.put("state.json", {d: {"id": i, "url": url(i)} for d, i in entries.items()})
 
     def rows(self, *ids, more=False):
-        return self.put("board.json", {"rows": [[i, "Ready"] for i in ids], "hasMore": more})
+        return self.put("board.json", {"count": len(ids), "rows": [[i, "Ready"] for i in ids], "hasMore": more})
 
     def saved_board(self, *ids, wrapped):
         result = {"results": [{"Story ID": i, "Status": "Ready", "url": url(i)} for i in ids], "has_more": False}
@@ -291,6 +291,17 @@ class Verify(Tmp):
     def test_every_filed_id_once_is_clean(self):
         r = self.verify(self.rows("XY-01", "XY-02", "XY-B1"), self.ledger({"D1": "XY-01", "D2": "XY-B1"}))
         self.assertEqual(r.returncode, 0, r.stdout)
+
+    def test_an_inline_page_without_a_true_count_or_with_resolved_is_refused(self):
+        """LC-B15: an inline page states its row count, and a dropped row fails loudly."""
+        ledger = self.ledger({"D1": "XY-01"})
+        for page, needle in (({"rows": [["XY-01", "Ready"]], "hasMore": False}, "needs `count`"),
+                             ({"count": 2, "rows": [["XY-01", "Ready"]], "hasMore": False}, "count 2 but gives 1"),
+                             ({"resolved": True}, "carries no rows")):
+            with self.subTest(needle=needle):
+                r = self.verify(self.put("board.json", page), ledger)
+                self.assertNotEqual(r.returncode, 0, r.stdout)
+                self.assertIn(needle, r.stdout + r.stderr)
 
     def test_catches_a_missing_id(self):
         r = self.verify(self.rows("XY-01"), self.ledger({"D1": "XY-01", "D2": "XY-02"}))

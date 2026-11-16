@@ -124,17 +124,44 @@ def fetch_text(path):
 
 
 def parse_views(text):
-    return {vid.replace("-", ""): json.loads(body)
-            for vid, body in re.findall(r'<view url="\{\{view://([0-9a-f-]+)\}\}">\s*(.*?)\s*</view>', text, re.S)}
+    """{view id: view config} from the <view> blocks in a fetch result.
+
+    Loud on anything short of a whole block: an opened <view> with no matching
+    close, or a body that is not a JSON object, is a ValueError. A truncated copy of
+    an inline result must not read as a board with one view fewer."""
+    found = re.findall(r'<view url="\{\{view://([0-9a-f-]+)\}\}">\s*(.*?)\s*</view>', text, re.S)
+    opened = len(re.findall(r"<view url=", text))
+    if opened != len(found):
+        raise ValueError(f"{opened} <view> block(s) opened but {len(found)} closed - truncated?")
+    views = {}
+    for vid, body in found:
+        try:
+            cfg = json.loads(body)
+        except ValueError as e:
+            raise ValueError(f"view {vid}: its block is not valid JSON - truncated or mis-copied? ({e})") from None
+        if not isinstance(cfg, dict) or "type" not in cfg:
+            raise ValueError(f"view {vid}: its block is not a view configuration (no `type`)")
+        views[vid.replace("-", "")] = cfg
+    return views
 
 
 def parse_database(path):
-    """(data source state, {view id: view config}) from a database fetch result."""
+    """(data source state, {view id: view config}) from a database fetch result.
+
+    The result is the file the tool saved, or, for one that came back inline, a
+    text file holding only its <data-source-state> and <view> blocks: nothing else
+    in a fetch is read, so nothing else needs copying (LC-B15)."""
     text = fetch_text(path)
     m = re.search(r"<data-source-state>\s*(.*?)\s*</data-source-state>", text, re.S)
     if not m:
         raise ValueError(f"{path}: no <data-source-state> - is this a fetch of the database?")
-    return json.loads(m.group(1)), parse_views(text)
+    try:
+        state = json.loads(m.group(1))
+    except ValueError as e:
+        raise ValueError(f"{path}: <data-source-state> is not valid JSON - truncated or mis-copied? ({e})") from None
+    if not isinstance(state, dict) or not isinstance(state.get("schema"), dict) or not state.get("url"):
+        raise ValueError(f"{path}: <data-source-state> has no `schema` object or no `url` - not a whole data source")
+    return state, parse_views(text)
 
 
 # -------------------------------------------------------------- comparison

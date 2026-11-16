@@ -14,7 +14,7 @@
 Every subcommand exits 1 on a failure and 0 otherwise, so the verdict is the
 script's and not the session's. Like doctor.py it cannot reach Notion: the skill
 queries the board and hands the results over, in doctor's page format -
-{"file": path} | {"rows": [[id, status], ...], "hasMore": bool} | {"error": text},
+{"file": path} | {"count": n, "rows": [[id, status], ...], "hasMore": bool} | {"error": text},
 or a list of those pages.
 
 PROPOSAL is the backlog the session drafted and the user reviewed:
@@ -143,6 +143,9 @@ def board_ids(board_path):
     ids, complete = [], True
     base = os.path.dirname(os.path.abspath(board_path))
     for p in pages:
+        if isinstance(p, dict) and "resolved" in p:
+            raise SystemExit("board query: {\"resolved\": true} carries no rows - give the saved file, "
+                             "or an inline page's count and rows")
         rows, has_more, error = read_page(p, base)
         if error:
             raise SystemExit(f"board query failed: {error}")
