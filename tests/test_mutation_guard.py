@@ -60,8 +60,8 @@ MUTATIONS = [
     ),
     (
         "unknown_lead_stops_marking_a_floor",
-        "return (0.0, 0.0, False) if lead is None else (lead[0], lead[1], True)",
-        "return (0.0, 0.0, True) if lead is None else (lead[0], lead[1], True)",
+        "            return (0.0, 0.0, False)\n",
+        "            return (0.0, 0.0, True)\n",
         "a guessed-at zero would be printed as a known total",
     ),
     (
@@ -79,6 +79,18 @@ MUTATIONS = [
         "        lo, hi, known = self.lead(pid)\n"
         "        blo = bhi = 0.0\n",
         "a dependency cycle would hang or guess instead of refusing to rank",
+    ),
+    (
+        "started_clock_counts_elapsed_days_backwards",
+        "return max(0, (self.today - it[\"started\"]).days)",
+        "return max(0, (it[\"started\"] - self.today).days)",
+        "a clock started weeks ago would be projected as if started today (LC-29)",
+    ),
+    (
+        "started_clock_adds_elapsed_days_instead_of_subtracting",
+        "return (max(0.0, lead[0] - ran), max(0.0, lead[1] - ran), True)",
+        "return (max(0.0, lead[0] + ran), max(0.0, lead[1] + ran), True)",
+        "a running clock would grow later the longer it ran (LC-29)",
     ),
 ]
 

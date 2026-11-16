@@ -164,13 +164,42 @@ def parse_database(path):
     return state, parse_views(text)
 
 
+# --------------------------------------------------------------------- ddl
+# One property's definition in the DDL Notion's create-database and
+# update-data-source tools take. init.py builds a whole board from it; doctor.py
+# names it as the exact repair for a property an older board is missing.
+DDL_TYPES = {"title": "TITLE", "text": "RICH_TEXT", "number": "NUMBER", "checkbox": "CHECKBOX", "date": "DATE"}
+
+
+def sql(s):
+    return "'" + str(s).replace("'", "''") + "'"
+
+
+def column(p, ds):
+    t = p["type"]
+    if t in DDL_TYPES:
+        out = DDL_TYPES[t]
+    elif t == "select":
+        out = "SELECT(" + ", ".join(f"{sql(n)}:{c}" for n, c in p["options"]) + ")"
+    elif t == "relation":
+        out = f"RELATION({sql(ds[p['target']])}" + (f", DUAL {sql(p['dual'])}" if p.get("dual") else "") + ")"
+    else:
+        raise SystemExit(f"board.json: unsupported type {t!r} on {p['name']!r}")
+    if p.get("description"):
+        out += f" COMMENT {sql(p['description'])}"
+    return f'"{p["name"]}" {out}'
+
+
 # -------------------------------------------------------------- comparison
-def check_properties(label, want, have, ds_urls, ok, fail):
+def check_properties(label, want, have, ds_urls, ok, fail, missing_fix=None):
+    """missing_fix(p), when given, is appended to a missing property's FAIL - the
+    exact statement that adds it, so a board that predates a property can be
+    brought up to board.json without working the definition out by hand."""
     schema = have.get("schema") or {}
     for p in want["properties"]:
         got = schema.get(p["name"])
         if not got:
-            fail(f"{label}: property {p['name']!r} is missing")
+            fail(f"{label}: property {p['name']!r} is missing" + (f" - {missing_fix(p)}" if missing_fix else ""))
             continue
         if got.get("type") != p["type"]:
             fail(f"{label}: {p['name']!r} is {got.get('type')!r}, not {p['type']!r}")

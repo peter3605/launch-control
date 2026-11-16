@@ -9,6 +9,7 @@ Stdlib only, on purpose. The plugin ships no requirements file and should not
 start now, so the suite it is tested by does not get to have dependencies either.
 """
 import contextlib
+import datetime
 import hashlib
 import io
 import json
@@ -39,8 +40,8 @@ def u(sid):
 
 
 def row(sid, gating="Self-serve", lo=None, hi=None, status="Ready",
-        estimate="", blocked_by=(), lead_text="", name=None):
-    return {
+        estimate="", blocked_by=(), lead_text="", name=None, started=None):
+    r = {
         "Story ID": sid,
         "Name": name if name is not None else f"{sid} does a thing",
         "Gating": gating,
@@ -52,6 +53,9 @@ def row(sid, gating="Self-serve", lo=None, hi=None, status="Ready",
         "Blocked by": [u(b) for b in blocked_by],
         "url": u(sid),
     }
+    if started is not None:
+        r["Started"] = started
+    return r
 
 
 def clock(sid, lo=None, hi=None, **kw):
@@ -425,6 +429,81 @@ def u_id(sid):
     return mine.page_id(u(sid))
 
 
+class StartedClock(unittest.TestCase):
+    """LC-29: an In Progress clock is projected from the day it started, not from
+    today. TODAY is 2026-01-01; 2025-12-04 is 28 days before it."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+
+    run_mine = Report.run_mine
+
+    def test_started_28_days_ago_with_lead_42_finishes_in_14(self):
+        code, out = self.run_mine([clock("EF-1", 42, 42, status="In Progress", started="2025-12-04")])
+        self.assertEqual(code, 0, out)
+        # 42 - 28 = 14 days from 2026-01-01, not 42.
+        self.assertIn("earliest finish 2026-01-15 .. 2026-01-15", out)
+        self.assertIn("started 2025-12-04, 28 days in", out)
+        self.assertNotIn("2026-02-12", out)  # today + 42, the old projection
+
+    def test_the_remaining_lead_carries_through_the_blocker_chain(self):
+        b = mine.Board([clock("EF-1", 42, 42, status="In Progress", started="2025-12-04"),
+                        clock("EF-2", 3, 5, status="Backlog", blocked_by=["EF-1"])],
+                       datetime.date(2026, 1, 1))
+        self.assertEqual(b.finish(u_id("EF-1")), (14.0, 14.0, True))
+        self.assertEqual(b.finish(u_id("EF-2")), (17.0, 19.0, True))
+        self.assertEqual(b.chain(u_id("EF-1"))[:3], (17.0, 19.0, True))
+
+    def test_part_way_through_a_range_only_the_max_still_has_days_left(self):
+        b = mine.Board([clock("EF-1", 14, 42, status="In Progress", started="2025-12-04")],
+                       datetime.date(2026, 1, 1))
+        self.assertEqual(b.lead(u_id("EF-1")), (0.0, 14.0, True))
+
+    def test_started_longer_ago_than_lead_max_is_overdue_not_a_past_date(self):
+        # Started 2025-11-01: 61 days in, against a 42-day max.
+        code, out = self.run_mine([clock("EF-1", 14, 42, status="In Progress", started="2025-11-01")])
+        self.assertEqual(code, 0, out)
+        line = [l for l in out.splitlines() if l.startswith("  EF-1")][0]
+        self.assertIn("earliest finish overdue", line)
+        self.assertIn("61 days in - past its 42-day max", line)
+        self.assertNotIn("2025-12", line)  # no date in the past
+        self.assertNotRegex(line, r"-\d+ days|\.\. -")  # no negative number
+        b = mine.Board([clock("EF-1", 14, 42, status="In Progress", started="2025-11-01")],
+                       datetime.date(2026, 1, 1))
+        self.assertEqual(b.lead(u_id("EF-1")), (0.0, 0.0, True))
+
+    def test_started_blank_keeps_todays_behaviour(self):
+        code, out = self.run_mine([clock("EF-1", 42, 42, status="In Progress")])
+        self.assertEqual(code, 0, out)
+        self.assertIn("earliest finish 2026-02-12 .. 2026-02-12", out)
+        self.assertIn("no Started, so projected from today", out)
+
+    def test_started_is_ignored_on_a_clock_that_is_not_running(self):
+        code, out = self.run_mine([clock("EF-1", 42, 42, status="Ready", started="2025-12-04")])
+        self.assertEqual(code, 0, out)
+        self.assertIn("earliest finish 2026-02-12 .. 2026-02-12", out)
+        self.assertNotIn("days in", out)
+
+    def test_a_started_in_the_future_has_run_no_days(self):
+        b = mine.Board([clock("EF-1", 10, 10, status="In Progress", started="2026-01-05")],
+                       datetime.date(2026, 1, 1))
+        self.assertEqual(b.lead(u_id("EF-1")), (10.0, 10.0, True))
+
+    def test_a_view_read_gives_the_date_in_its_expanded_column(self):
+        r = clock("EF-1", 42, 42, status="In Progress")
+        r["date:Started:start"] = "2025-12-04"
+        code, out = self.run_mine([r])
+        self.assertEqual(code, 0, out)
+        self.assertIn("earliest finish 2026-01-15 .. 2026-01-15", out)
+
+    def test_a_malformed_started_in_a_view_file_exits_one(self):
+        code, out = self.run_mine([clock("EF-1", 42, 42, status="In Progress", started="04/12/2025")])
+        self.assertEqual(code, 1, out)
+        self.assertIn("FAIL", out)
+        self.assertIn("'04/12/2025' is not a YYYY-MM-DD date", out)
+
+
 class InlinePage(unittest.TestCase):
     """LC-B16: an inline page of Your turn is given in a short checked form, never
     re-typed whole into a file."""
@@ -461,6 +540,12 @@ class InlinePage(unittest.TestCase):
         self.assertIn("EF-2", out)
         self.assertIn("2026-01-06 .. 2026-01-08", out)  # 3-5 days then 2: finish 5..7 from 2026-01-01
 
+    def test_an_inline_row_carries_started(self):
+        code, out = self.run_mine(None, {"count": 1, "hasMore": False, "rows": [
+            clock("EF-1", 42, 42, status="In Progress", started="2025-12-04")]})
+        self.assertEqual(code, 0, out)
+        self.assertIn("earliest finish 2026-01-15 .. 2026-01-15", out)
+
     def test_a_whole_read_inline_needs_no_view_file(self):
         code, out = self.run_mine(None, {"count": 1, "hasMore": False, "rows": [clock("EF-1", 3, 5)]})
         self.assertEqual(code, 0, out)
@@ -478,6 +563,9 @@ class InlinePage(unittest.TestCase):
             ({"count": 1, "hasMore": False, "rows": [dict(good, Gating="Outside")]}, "Gating 'Outside'"),
             ({"count": 1, "hasMore": False, "rows": [dict(good, **{"Lead days max": "ten"})]}, "is not a number"),
             ({"count": 1, "hasMore": False, "rows": [dict(good, **{"Blocked by": ["EF-0"]})]}, "Blocked by must be"),
+            ({"count": 1, "hasMore": False, "rows": [dict(good, Started="2025-13-45")]}, "Started '2025-13-45' is not a YYYY-MM-DD date"),
+            ({"count": 1, "hasMore": False, "rows": [dict(good, Started="last month")]}, "Started 'last month' is not a YYYY-MM-DD date"),
+            ({"count": 1, "hasMore": False, "rows": [dict(good, Started=20251204)]}, "Started 20251204 is not a YYYY-MM-DD date"),
             ('{"count": 1, "hasMore": false, "rows": [{"Story ID"', "not valid JSON"),
         ]
         for inline, needle in cases:
@@ -530,6 +618,9 @@ class ShippedSample(unittest.TestCase):
         desk = out.split("YOUR DESK", 1)[1].split("START TODAY", 1)[0]
         self.assertEqual(len([l for l in desk.splitlines() if l.startswith("  HX-")]), 2, desk)
         self.assertIn("slack = 42 - 42 = 0", out)
+        # LC-29: a clock already running, projected from the day it started.
+        self.assertIn("HX-11    lead    5-30  earliest finish 2026-09-16 .. 2026-09-25  "
+                      "[In Progress, started 2026-08-26, 21 days in]", out)
 
     def test_the_sample_carries_no_real_notion_ids(self):
         # Public repo: every page id in the sample is a visible placeholder.

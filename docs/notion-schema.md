@@ -33,6 +33,7 @@ The work. Properties, in rough order of how much they carry:
 | **Lead time** | Text | Why the outside world takes as long as it does, and what makes it worse: "each rejection restarts the clock". Read by people, not computed with |
 | **Lead days min** | Number | Calendar days the third party takes on a good run. Convert business days (5 business = 7 calendar) |
 | **Lead days max** | Number | Calendar days on a bad but ordinary run — the prose's stated upper figure. With min, what lets `/lc:mine` project finish dates and rank by calendar cost. An External story with neither is listed as unranked, never guessed |
+| **Started** | Date | The day an External clock was started. `/lc:start` sets it to today when it claims an External story whose Started is empty, and never overwrites one already there. `/lc:mine` takes the days since then off an In Progress clock's lead, so a clock four weeks in is not projected as if it started today. Blank means projected from today. Added in 0.13.0: `/lc:doctor` names the exact column to add on an older board |
 | **Blocked by** | Relation → Stories (self) | Real edges. Lets `/lc:done` walk the graph and promote what just became unblocked |
 | **Notes and traps** | Text | Where expensive mistakes are recorded so they are paid for once. Commands read this out rather than summarising it |
 | **Last session** | Text | Date, what was done, commit SHA, PR number |

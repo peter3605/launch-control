@@ -13,10 +13,11 @@ short form, only the fields this script reads, with the row count stated:
     {"count": 2, "hasMore": false, "rows": [
       {"Story ID": "APP-3", "Name": "...", "Status": "Ready", "Gating": "External",
        "Estimate": "S", "Lead days min": 3, "Lead days max": 10, "Lead time": "...",
-       "Blocked by": ["https://..."], "url": "https://..."}, ...]}
+       "Started": "2026-01-05", "Blocked by": ["https://..."], "url": "https://..."}, ...]}
 
 `count` is checked against `rows`, and a key outside that list, a URL with no
-page id, an unknown Status or Gating, or a lead day that is not a number fails
+page id, an unknown Status or Gating, a lead day that is not a number, or a
+Started that is not a YYYY-MM-DD date fails
 loudly (exit 1) rather than ranking a board with a row missing or misread.
 
 Exits 1 if the rows cannot be ranked honestly (a dependency cycle, or no rows),
@@ -26,6 +27,10 @@ The arithmetic, all in calendar days:
 
   lead(X)    External: Lead days min..max. Self-serve: 0..0 - desk work is
              hours, and this ranks by the days the outside world takes.
+             An In Progress clock with Started set has already run some of
+             that: each bound becomes max(0, bound - days since Started), so a
+             clock started four weeks ago is not projected as if started today.
+             Past its max it is overdue. With Started blank it counts from today.
   finish(X)  lead(X) + the latest finish among X's open blockers. Blockers
              that are not in the view are Done or agent work, and add nothing.
   chain(X)   lead(X) + the longest run of leads through the items waiting on X.
@@ -90,12 +95,33 @@ def span(lo, hi):
 
 
 INLINE_KEYS = {"Story ID", "Name", "Status", "Gating", "Estimate", "Lead days min", "Lead days max",
-               "Lead time", "Blocked by", "url"}
+               "Lead time", "Started", "Blocked by", "url"}
 STATUSES = {"Backlog", "Ready", "In Progress", "Blocked", "In Review", "Done"}
 
 
 class InlineError(Exception):
     pass
+
+
+def started_of(r):
+    """A row's Started as a date, or None when blank. A view read returns a date
+    property as `date:Started:start`; the inline form and a hand-made file say
+    `Started`. Raises ValueError on anything that is not a YYYY-MM-DD date (a
+    date-time keeps its date part)."""
+    v = r.get("Started")
+    if v in (None, ""):
+        v = r.get("date:Started:start")
+    if isinstance(v, dict):  # {"start": ..., "end": ...}
+        v = v.get("start")
+    if v in (None, ""):
+        return None
+    bad = ValueError(f"Started {v!r} is not a YYYY-MM-DD date")
+    if not isinstance(v, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}(T.*)?", v):
+        raise bad
+    try:
+        return datetime.date.fromisoformat(v[:10])
+    except ValueError:
+        raise bad from None
 
 
 def load_inline(path):
@@ -136,6 +162,10 @@ def load_inline(path):
             v = r.get(k)
             if v not in (None, "") and (isinstance(v, bool) or not isinstance(v, (int, float))):
                 raise InlineError(f"{label}: {k} {v!r} is not a number (leave it out if blank)")
+        try:
+            started_of(r)
+        except ValueError as e:
+            raise InlineError(f"{label}: {e} (leave it out if blank)") from None
         blockers = r.get("Blocked by", [])
         if not isinstance(blockers, list) or not all(isinstance(b, str) and page_id(b) for b in blockers):
             raise InlineError(f"{label}: Blocked by must be a list of Notion page URLs")
@@ -153,7 +183,8 @@ def load(paths):
 
 
 class Board:
-    def __init__(self, rows):
+    def __init__(self, rows, today=None):
+        self.today = today or datetime.date.today()
         self.items = {}
         for r in rows:
             pid = page_id(r.get("url"))
@@ -177,6 +208,7 @@ class Board:
                 "estimate": r.get("Estimate") or "",
                 "leadText": plain(r.get("Lead time")),
                 "lead": lead,
+                "started": started_of(r),
                 "blockers": relation(r.get("Blocked by")),
             }
         for it in self.items.values():
@@ -190,10 +222,25 @@ class Board:
     def project(self, pid):
         return self.items[pid]["id"].split("-", 1)[0]
 
+    def elapsed(self, pid):
+        """Calendar days an In Progress clock has been running, from its Started;
+        None when it is not running or Started is blank. A Started in the future
+        has run no days yet."""
+        it = self.items[pid]
+        if it["status"] != "In Progress" or not it["external"] or it["started"] is None:
+            return None
+        return max(0, (self.today - it["started"]).days)
+
     def lead(self, pid):
-        """(min, max, known) - an unknown lead counts as 0 and marks the total a floor."""
+        """(min, max, known) still to run - an unknown lead counts as 0 and marks
+        the total a floor. A running clock's lead is what remains of it."""
         lead = self.items[pid]["lead"]
-        return (0.0, 0.0, False) if lead is None else (lead[0], lead[1], True)
+        if lead is None:
+            return (0.0, 0.0, False)
+        ran = self.elapsed(pid)
+        if ran is None:
+            return (lead[0], lead[1], True)
+        return (max(0.0, lead[0] - ran), max(0.0, lead[1] - ran), True)
 
     def finish(self, pid, stack=()):
         if pid in self._finish:
@@ -246,7 +293,11 @@ def main():
     # Bound unconditionally: shown() below used to dodge a NameError only because
     # `not args.prefix or ...` short-circuits first, which is one edit from a crash.
     keep = args.prefix.rstrip("-").upper() if args.prefix else ""
-    board = Board(rows)
+    try:
+        board = Board(rows, today)
+    except ValueError as e:
+        print(f"  FAIL  {e} - fix it on the board; a clock's dates cannot be projected from it")
+        return 1
     if not board.items:
         print("No rows. Either nothing is waiting on a human, or the query returned nothing - check the view.")
         return 1
@@ -285,12 +336,18 @@ def main():
         flo, fhi, fknown = board.finish(p)
         waiting = [items[b]["id"] for b in it["open_blockers"]]
         state = it["status"]
-        if state == "In Progress":
-            state += ", running - projected from today, so the dates are late-side"
+        ran = board.elapsed(p)
+        overdue = ran is not None and ran > it["lead"][1]
+        if ran is not None:
+            state += f", started {it['started'].isoformat()}, {ran} days in"
+            if overdue:
+                state += f" - past its {days(it['lead'][1])}-day max"
+        elif state == "In Progress":
+            state += ", running - no Started, so projected from today and the dates are late-side"
         elif waiting:
             state += ", waits on " + ", ".join(waiting)
-        print(f"  {it['id']:8} lead {span(*it['lead']):>7}  earliest finish "
-              f"{date(flo)} .. {date(fhi)}{floor(fknown)}  [{state}]")
+        when = "overdue" if overdue else f"{date(flo)} .. {date(fhi)}{floor(fknown)}"
+        print(f"  {it['id']:8} lead {span(*it['lead']):>7}  earliest finish {when}  [{state}]")
         print(f"           {it['name']}")
     if unranked:
         print("\n  Unranked - External with no Lead days, so nothing can compute with them:")

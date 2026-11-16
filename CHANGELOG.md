@@ -17,6 +17,32 @@ enforces it; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
+## 0.13.0 — 2026-11-15
+
+**`/lc:mine` projects an in-flight clock from the day it started, not from today.** (LC-29)
+
+- **Why.** An In Progress clock was projected as if it started today, so a
+  registration filed four weeks ago still showed its whole lead ahead of it, and
+  the dates were late by exactly the time already waited.
+- **New Stories property `Started`** (date) in `board.json`, so `/lc:init`
+  provisions it. On an existing board `/lc:doctor` fails until it is added, and
+  names the exact statement: `ADD COLUMN "Started" DATE COMMENT '...'` on
+  `stories.dataSource` through update-data-source. The `yourTurn` view shows it.
+  The DDL generation moved from `init.py` into `boardcheck.py` so doctor can print it.
+- **`/lc:start`** sets Started to today on an External story whose Started is
+  empty, and never overwrites one already there.
+- **`mine.py`** reads Started from a view file (`Started` or `date:Started:start`)
+  and from `--inline`, where it is a new allowed key; a malformed date exits 1. An
+  In Progress clock with Started set runs each lead bound as
+  `max(0, bound - days since Started)` through the blocker chain, and its row shows
+  the start date and the days it has run. Past its lead max it prints
+  `earliest finish overdue`, never a past date or a negative number. With Started
+  blank it projects from today and says so, as before.
+- The sample board has a started clock, and the mutation guard covers the
+  elapsed-days subtraction.
+
+---
+
 ## 0.12.0 — 2026-11-15
 
 **`/lc:mine` no longer asks for an inline view page to be re-typed.** (LC-B16)
