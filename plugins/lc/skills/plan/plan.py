@@ -9,7 +9,7 @@
     plan.py record   --state STATE --draft D --id ID --url URL [--replace]
     plan.py verify   --state STATE --board FILE --prefix P
     plan.py config   --repo DIR --from SIBLING_CONFIG --project KEY --prefix P
-                     --project-page URL --road URL --next URL
+                     --project-page URL --road URL --next URL --open URL
 
 Every subcommand exits 1 on a failure and 0 otherwise, so the verdict is the
 script's and not the session's. Like doctor.py it cannot reach Notion: the skill
@@ -132,7 +132,7 @@ def load_state(path):
 
 def filed(state):
     """The stories in a state file. Keys starting with _ are the run's provisioning
-    records (_project, _road, _next), not stories."""
+    records (_project, _road, _next, _open), not stories."""
     return {d: v for d, v in state.items() if not d.startswith("_")}
 
 
@@ -657,11 +657,14 @@ def cmd_config(args):
                if not (sib.get("views") or {}).get(k)]
     if missing:
         fail(f"sibling config is missing shared views: {', '.join(missing)}")
-    for flag, url in (("--road", args.road), ("--next", args.next)):
+    given = (("--road", args.road), ("--next", args.next), ("--open", args.open))
+    for flag, url in given:
         if "v=" not in url:
             fail(f"{flag} has no ?v= view id")
-    if args.road == args.next:
-        fail("--road and --next are the same view - next is a second view, filtered to Ready stories")
+    for i, (fa, ua) in enumerate(given):
+        for fb, ub in given[i + 1:]:
+            if ua == ub:
+                fail(f"{fa} and {fb} are the same view - road, next and open are three views, each filtered its own way")
     if problems:
         return finish()
 
@@ -674,9 +677,10 @@ def cmd_config(args):
         warn(f"no reachable origin - baseBranch set to the current branch {base!r}; check it before /lc:done")
 
     # A sibling's road and next are its own project's; this project gets its own.
-    views = {k: v for k, v in sib["views"].items() if k not in ("road", "next")}
+    views = {k: v for k, v in sib["views"].items() if k not in ("road", "next", "open")}
     views["road"] = args.road
     views["next"] = args.next
+    views["open"] = args.open
     cfg = {
         "project": args.project,
         "prefix": args.prefix,
@@ -749,7 +753,7 @@ def main():
 
     c = sub.add_parser("record")
     c.add_argument("--state", required=True)
-    c.add_argument("--draft", required=True, help="a draft ID, or _project / _road / _next")
+    c.add_argument("--draft", required=True, help="a draft ID, or _project / _road / _next / _open")
     c.add_argument("--id", default="")
     c.add_argument("--url", required=True)
     c.add_argument("--replace", action="store_true", help="renumbering a row that lost an ID race")
@@ -767,6 +771,7 @@ def main():
     c.add_argument("--project-page", required=True)
     c.add_argument("--road", required=True)
     c.add_argument("--next", required=True, help="this project's next view, what /lc:next reads")
+    c.add_argument("--open", required=True, help="this project's open view, what /lc:start and /lc:reconcile read")
 
     args = ap.parse_args()
     return {

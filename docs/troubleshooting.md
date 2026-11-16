@@ -249,8 +249,10 @@ is blunt.
 
 | It says | What it means |
 |---|---|
-| `missing view keys: ...` | `views` is missing one of the eight the commands read. `/lc:init` writes all eight; a hand-edited config is the usual cause. |
+| `missing view keys: ...` | `views` is missing one of the ten the commands read. `/lc:init` writes all ten; a hand-edited config is the usual cause. |
 | `views.next is missing - a board provisioned before 0.10.0 ...` | This project has no `next` view, the one `/lc:next` reads (its Ready, agent-doable stories). Until it does, `/lc:next` falls back to reading the whole road. Create a table view on the Stories database with the name and `configure` line the message gives, and add its URL to `views.next`. |
+| `views.open is missing - a board provisioned before 0.14.0 ...` | This project has no `open` view, the one `/lc:start` and `/lc:reconcile` read (its stories that are not Done). Until it does, they fall back to reading the whole road, which keeps every Done row and so grows with the project's history. Create a table view on the Stories database with the name and `configure` line the message gives, and add its URL to `views.open`. |
+| `views.dependents is missing - a board provisioned before 0.14.0 ...` | The board has no `dependents` view, the one `/lc:done` and `/lc:reconcile` read to find what a closed story unblocks (every project's open stories that name a blocker). Until it does, they fall back to paging the whole board view. It is shared: create it once, with the name and `configure` line the message gives, and add the same URL to `views.dependents` in every repo config on the board. |
 | `views.X points at a database other than stories.database` | A copied-and-pasted URL from a different board. Every view must belong to the Stories database named in the same config. |
 | `views.X has no ?v= view id - it opens the database, not a view` | The URL was copied from the database page rather than from a specific view, so it ignores that view's filters. This is how a "scoped" query quietly stops being scoped. |
 | `views.X was not queried - a check that did not run is not a pass` | The session skipped a view when gathering results. Re-run `/lc:doctor`. |
@@ -265,6 +267,8 @@ is blunt.
 | `views.road returned Story IDs outside PREFIX-` | The road view is not filtered to this project. It is meant to show one project alone; a shared browse view must never be substituted for it. |
 | `views.next returned Story IDs outside PREFIX-` | The next view is not filtered to this project, so `/lc:next` would hand out another repo's work. Fix its filter with the line `init.py views --next` prints. |
 | `views.next returned stories that are not Ready` | The next view lost its Status filter. Same fix. An empty next view is fine: nothing is Ready. |
+| `views.open returned Story IDs outside PREFIX-` | The open view is not filtered to this project, so `/lc:start` could bind another repo's story. Fix its filter with the line `init.py views --open` prints. |
+| `views.open returned Done stories` | The open view lost its `Status != Done` filter, so `/lc:start` and `/lc:reconcile` read the project's whole history again. Same fix. An empty open view is fine once the road is not empty: every story is Done. |
 | `Story ID on more than one row` | Two stories carry the same ID. Every command that looks a story up by ID will now find the wrong one roughly half the time. Fix it on the board. |
 
 ### Board schema against board.json
@@ -287,6 +291,7 @@ about a schema difference is your call.
 | `views.X: ... is not a view of the Stories database` | The view in the config does not appear in the database fetch. It was deleted, or it belongs to another database. |
 | `views.road ...: filter is ...` | The road view is not filtered to this project's row (`projectPageId`). The message carries the `init.py views --road` command that prints its `configure` line. |
 | `views.next ...: filter is ...` | The same for the next view. `init.py views --next` prints its line. |
+| `views.open ...: filter is ...` | The same for the open view. `init.py views --open` prints its line. |
 | `skip views.road filter - no projectPageId in the config` | There is no `projectPageId` to compare the road's filter with. Not a failure; the road's prefix check above still runs. |
 | `stories: ... is data source X, but stories.dataSource is Y` | The fetch is of a different database from the one the config names. Re-run `/lc:doctor`, fetching `stories.database` and `projects.database` from this repo's config. |
 | `board schema was not checked - pass --stories and --projects` | The session ran a full check without the two database fetches. Re-run `/lc:doctor`. |

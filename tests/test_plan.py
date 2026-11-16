@@ -347,14 +347,15 @@ class Config(Tmp):
             "stories": {"database": url("stories"), "dataSource": "collection://" + "1" * 8 + "-1111-1111-1111-" + "1" * 12},
             "projects": {"database": url("projects"), "dataSource": "collection://" + "2" * 8 + "-2222-2222-2222-" + "2" * 12},
             "views": {k: f"{url('stories')}?v={hashlib.md5(k.encode()).hexdigest()}"
-                      for k in ("ready", "inProgress", "inReview", "waitingExternal", "yourTurn", "board", "road", "next")},
+                      for k in ("ready", "inProgress", "inReview", "waitingExternal", "yourTurn", "board", "dependents",
+                                "road", "next", "open")},
             "viewContract": "scope by road",
         })
 
     def config(self, repo, prefix="XY", page=None):
         return run("config", "--repo", repo, "--from", self.sibling(), "--project", "my-app", "--prefix", prefix,
                    "--project-page", page or url("my-app-row"), "--road", f"{url('stories')}?v={'a' * 32}",
-                   "--next", f"{url('stories')}?v={'c' * 32}")
+                   "--next", f"{url('stories')}?v={'c' * 32}", "--open", f"{url('stories')}?v={'d' * 32}")
 
     def test_refuses_to_overwrite_another_projects_config(self):
         repo = os.path.join(self.tmp, "repo")
@@ -380,6 +381,10 @@ class Config(Tmp):
         self.assertEqual(cfg["views"]["road"], f"{url('stories')}?v={'a' * 32}")
         self.assertEqual(cfg["views"]["next"], f"{url('stories')}?v={'c' * 32}",
                          "the sibling's next is its own project's and must not be copied")
+        self.assertEqual(cfg["views"]["open"], f"{url('stories')}?v={'d' * 32}",
+                         "the sibling's open is its own project's and must not be copied")
+        self.assertEqual(cfg["views"]["dependents"], f"{url('stories')}?v={hashlib.md5(b'dependents').hexdigest()}",
+                         "dependents is shared across the board, so it is copied")
         self.assertEqual(cfg["projectPageId"], hashlib.md5(b"my-app-row").hexdigest())
         self.assertFalse(cfg["git"]["enabled"], "a temp dir is not a git repo")
         self.assertFalse(cfg["git"]["autoMerge"])
@@ -400,7 +405,8 @@ class Config(Tmp):
         repo = os.path.join(self.tmp, "repo")
         os.makedirs(repo)
         r = run("config", "--repo", repo, "--from", self.sibling(), "--project", "my-app", "--prefix", "XY",
-                "--project-page", url("row"), "--road", url("stories"), "--next", f"{url('stories')}?v={'c' * 32}")
+                "--project-page", url("row"), "--road", url("stories"), "--next", f"{url('stories')}?v={'c' * 32}",
+                "--open", f"{url('stories')}?v={'d' * 32}")
         self.assertEqual(r.returncode, 1)
         self.assertFalse(os.path.exists(os.path.join(repo, ".claude", "launch-control.json")))
 
@@ -409,7 +415,7 @@ class Config(Tmp):
         os.makedirs(repo)
         road = f"{url('stories')}?v={'a' * 32}"
         base = ("config", "--repo", repo, "--from", self.sibling(), "--project", "my-app", "--prefix", "XY",
-                "--project-page", url("row"), "--road", road)
+                "--project-page", url("row"), "--road", road, "--open", f"{url('stories')}?v={'d' * 32}")
         self.assertNotEqual(run(*base).returncode, 0, "a config without --next must not be written")
         r = run(*base, "--next", road)
         self.assertEqual(r.returncode, 1, r.stdout)
@@ -417,6 +423,22 @@ class Config(Tmp):
         r = run(*base, "--next", url("stories"))
         self.assertEqual(r.returncode, 1, r.stdout)
         self.assertIn("--next has no ?v= view id", fails(r)[0])
+        self.assertFalse(os.path.exists(os.path.join(repo, ".claude", "launch-control.json")))
+
+    def test_open_is_required_and_must_be_a_view_of_its_own(self):
+        repo = os.path.join(self.tmp, "repo")
+        os.makedirs(repo)
+        road, nxt = f"{url('stories')}?v={'a' * 32}", f"{url('stories')}?v={'c' * 32}"
+        base = ("config", "--repo", repo, "--from", self.sibling(), "--project", "my-app", "--prefix", "XY",
+                "--project-page", url("row"), "--road", road, "--next", nxt)
+        self.assertNotEqual(run(*base).returncode, 0, "a config without --open must not be written")
+        for same, flag in ((road, "--road"), (nxt, "--next")):
+            r = run(*base, "--open", same)
+            self.assertEqual(r.returncode, 1, r.stdout)
+            self.assertTrue(any(flag in f and "--open" in f and "same view" in f for f in fails(r)), fails(r))
+        r = run(*base, "--open", url("stories"))
+        self.assertEqual(r.returncode, 1, r.stdout)
+        self.assertIn("--open has no ?v= view id", fails(r)[0])
         self.assertFalse(os.path.exists(os.path.join(repo, ".claude", "launch-control.json")))
 
 

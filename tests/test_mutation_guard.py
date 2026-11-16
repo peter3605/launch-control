@@ -130,6 +130,22 @@ BOARD_MUTATIONS = [
         "tests.test_doctor",
     ),
     (
+        "boardcheck_ignores_emptiness_filters",
+        BOARDCHECK,
+        "    if op in EMPTINESS:\n        # Notion stores",
+        "    if False:\n        # Notion stores",
+        "the dependents view's Blocked by IS NOT EMPTY filter could never be confirmed, so a correct board would fail",
+        "tests.test_init",
+    ),
+    (
+        "doctor_open_view_accepts_done_rows",
+        DOCTOR,
+        'done = sorted({i for i, st in rows if st == "Done"})',
+        "done = []",
+        "an open view that lost its Status filter would pass, and /lc:start would read Done history again",
+        "tests.test_doctor",
+    ),
+    (
         "plan_next_id_ignores_the_ledger",
         PLAN,
         'taken = ids + [v["id"] for v in state.values()]',

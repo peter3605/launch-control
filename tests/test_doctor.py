@@ -32,7 +32,7 @@ def config():
         "projectPageId": hx("project-row"),
         "stories": st["stories"],
         "projects": st["projects"],
-        "views": dict(st["views"], road=st["road"], next=st["next"]),
+        "views": dict(st["views"], road=st["road"], next=st["next"], open=st["open"]),
         "git": {"enabled": False},
     }
 
@@ -43,6 +43,7 @@ def views_file(tmp, nxt=None, override=None):
     results["road"] = {"count": 2, "rows": [["APP-1", "Ready"], ["APP-2", "Done"]], "hasMore": False}
     nxt = nxt if nxt is not None else [["APP-1", "Ready"]]
     results["next"] = {"count": len(nxt), "rows": nxt, "hasMore": False}
+    results["open"] = {"count": 1, "rows": [["APP-1", "Ready"]], "hasMore": False}
     results.update(override or {})
     path = os.path.join(tmp, "views.json")
     with open(path, "w") as f:
@@ -117,7 +118,7 @@ class InlineInput(unittest.TestCase):
                 self.assertTrue(any(x.startswith("views.road did not resolve") and needle in x for x in fails(r)), fails(r))
 
     def test_resolved_cannot_stand_in_for_road_or_next(self):
-        for k in ("road", "next"):
+        for k in ("road", "next", "open"):
             with self.subTest(k=k), tempfile.TemporaryDirectory() as tmp:
                 r = doctor(Board(), tmp, override={k: {"resolved": True}})
                 self.assertEqual(r.returncode, 1, r.stdout)
@@ -319,6 +320,51 @@ class BoardSchema(unittest.TestCase):
                 r = doctor(Board(), tmp, nxt=rows)
                 self.assertEqual(r.returncode, 1, r.stdout)
                 self.assertTrue(any(needle in x and x.startswith("views.next returned") for x in fails(r)), fails(r))
+
+    def test_config_without_open_fails_with_the_migration(self):
+        """LC-30: a board provisioned before 0.14.0 has no open view, and /lc:start falls
+        back to the whole road. A FAIL naming the view to create, not a silent pass."""
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = config()
+            del cfg["views"]["open"]
+            r = doctor(Board(with_open=False), tmp, cfg=cfg)
+        self.assertEqual(r.returncode, 1, r.stdout)
+        f = fails(r)
+        self.assertEqual(len(f), 1, f)
+        self.assertTrue(f[0].startswith("views.open is missing - a board provisioned before 0.14.0"), f[0])
+        self.assertIn("named 'Open — my-app'", f[0])
+        self.assertIn(f'`FILTER "Project" = "{PROJECT_PAGE}"; FILTER "Status" != "Done"; SORT BY "Seq" ASC', f[0])
+        self.assertIn("add its URL to views.open", f[0])
+        self.assertIn("views --open --key my-app", f[0])
+
+    def test_config_without_dependents_fails_with_the_migration(self):
+        """The shared view is one per board, so the line says to add it to every config."""
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = config()
+            del cfg["views"]["dependents"]
+            r = doctor(Board(), tmp, cfg=cfg)
+        self.assertEqual(r.returncode, 1, r.stdout)
+        f = fails(r)
+        self.assertEqual(len(f), 1, f)
+        self.assertTrue(f[0].startswith("views.dependents is missing - a board provisioned before 0.14.0"), f[0])
+        self.assertIn("named 'Waiting on a blocker'", f[0])
+        self.assertIn('`FILTER "Status" != "Done"; FILTER "Blocked by" IS NOT EMPTY; SORT BY "Seq" ASC', f[0])
+        self.assertIn("in every repo config on this board", f[0])
+
+    def test_open_rows_from_another_project_or_done_fail(self):
+        for rows, needle in (([["APP-1", "Ready"], ["OTH-3", "Ready"]], "outside APP-: OTH-3"),
+                             ([["APP-1", "Ready"], ["APP-2", "Done"]], "Done stories: APP-2")):
+            with self.subTest(needle=needle), tempfile.TemporaryDirectory() as tmp:
+                r = doctor(Board(), tmp, override={"open": {"count": len(rows), "rows": rows, "hasMore": False}})
+                self.assertEqual(r.returncode, 1, r.stdout)
+                self.assertTrue(any(needle in x and x.startswith("views.open returned") for x in fails(r)), fails(r))
+
+    def test_an_empty_open_view_passes(self):
+        """Every story Done is a finished project, not a scoping bug - the road catches those."""
+        with tempfile.TemporaryDirectory() as tmp:
+            r = doctor(Board(), tmp, override={"open": {"count": 0, "rows": [], "hasMore": False}})
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertIn("views.open resolves (0 rows, all APP- and not Done)", r.stdout)
 
     def test_an_empty_next_is_not_a_failure(self):
         """Unlike the road, nothing Ready is an ordinary state, not a scoping bug."""

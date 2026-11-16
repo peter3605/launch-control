@@ -16,7 +16,7 @@ or a list of pages in order, and each page is one of:
     {"resolved": true}                         an inline result for a shared view,
                                                whose rows are never inspected
     {"count": 2, "rows": [["APP-1", "Done"], ...], "hasMore": false}
-                                               an inline road or next page: how many
+                                               an inline road, next or open page: how many
                                                rows it held, and each one's Story ID
                                                and Status, stated rather than re-typed
 
@@ -50,7 +50,11 @@ from boardcheck import (spec, unwrap_saved, hex_id, ds_uuid, configure, repair, 
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 INIT_PY = os.path.normpath(os.path.join(HERE, "..", "init", "init.py"))
-VIEW_KEYS = ("ready", "inProgress", "inReview", "waitingExternal", "yourTurn", "board", "road", "next")
+VIEW_KEYS = ("ready", "inProgress", "inReview", "waitingExternal", "yourTurn", "board", "dependents",
+             "road", "next", "open")
+# Shared views added after the first boards were provisioned. A config without one
+# gets a migration line naming the view to create, not a bare "missing key".
+LATE_SHARED = ("dependents",)
 
 failures = []
 
@@ -288,6 +292,34 @@ def missing_next(cfg):
             f"(`python3 {INIT_PY} views --next --key {key} --project-url {url}` prints it)")
 
 
+def missing_open(cfg):
+    """The migration line for a config from before the per-project open view (0.14.0).
+
+    A FAIL, like a missing next view: /lc:start and /lc:reconcile without it fall
+    back to reading the whole road, Done rows and all, and that read only grows."""
+    page = hex_id(cfg.get("projectPageId"))
+    key = cfg.get("project") or "<project key>"
+    url = f"https://www.notion.so/{page}" if page else "<this project's Projects page URL>"
+    pv = project_view_spec("open", key, url)
+    return (f"views.open is missing - a board provisioned before 0.14.0 has no per-project open view, so /lc:start "
+            f"and /lc:reconcile fall back to reading the whole road, every Done row included. Create a table view on "
+            f"the Stories database named {pv['name']!r}, configured as `{configure(pv)}`, and add its URL to views.open "
+            f"(`python3 {INIT_PY} views --open --key {key} --project-url {url}` prints it)")
+
+
+def missing_shared(k):
+    """The migration line for a shared view a board provisioned earlier never got.
+
+    Shared means one per board: create it once and add the same URL to views.<k> in
+    every repo config on that board."""
+    v = next(v for v in spec()["views"] if v["key"] == k)
+    return (f"views.{k} is missing - a board provisioned before 0.14.0 has no {v['name']!r} view, so /lc:done and "
+            f"/lc:reconcile fall back to paging the whole board view, every project's Done rows included, to find "
+            f"what a closed story unblocks. Create a {v['type']} view on the Stories database named {v['name']!r}, "
+            f"configured as `{configure(v)}`, and add its URL to views.{k} in every repo config on this board "
+            f"(`python3 {INIT_PY} views` prints it)")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--repo", default=os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
@@ -329,13 +361,14 @@ def main():
     print("\nViews in config")
     views = cfg.get("views") or {}
     missing = [k for k in VIEW_KEYS if not views.get(k)]
-    if "next" in missing:
-        fail(missing_next(cfg))
-        missing.remove("next")
+    migrations = [k for k in missing if k in ("next", "open") + LATE_SHARED]
+    for k in migrations:
+        fail(missing_next(cfg) if k == "next" else missing_open(cfg) if k == "open" else missing_shared(k))
+        missing.remove(k)
     if missing:
         fail(f"missing view keys: {', '.join(missing)}")
-    elif views.get("next"):
-        ok("all eight view keys present")
+    elif not migrations:
+        ok(f"all {len(VIEW_KEYS)} view keys present")
     db = notion_id((cfg.get("stories") or {}).get("database"))
     for k in VIEW_KEYS:
         url = views.get(k)
@@ -393,7 +426,7 @@ def main():
             if error:
                 fail(f"views.{k} did not resolve: {error}")
                 continue
-            if k in ("road", "next") and any(isinstance(p, dict) and "resolved" in p for p in pages):
+            if k in ("road", "next", "open") and any(isinstance(p, dict) and "resolved" in p for p in pages):
                 fail(f"views.{k} was given as {{\"resolved\": true}} - its rows are checked, so give "
                      f"the saved file or an inline page's count and rows")
                 continue
@@ -409,8 +442,22 @@ def main():
                 if not (foreign or not_ready):
                     ok(f"views.next resolves ({len(rows)} row{'' if len(rows) == 1 else 's'}, all {prefix}- and Ready)")
                 continue
+            if k == "open":
+                # This project's, and never a Done row: a Done row here means the
+                # Status filter is gone and the read grows with history again.
+                foreign = sorted({i or "(blank)" for i, _ in rows if not i.startswith(f"{prefix}-")})
+                done = sorted({i for i, st in rows if st == "Done"})
+                if has_more:
+                    fail("views.open was not read to the last page - pass every page")
+                if foreign:
+                    fail(f"views.open returned Story IDs outside {prefix}-: {', '.join(foreign)}")
+                if done:
+                    fail(f"views.open returned Done stories: {', '.join(done)}")
+                if not (foreign or done or has_more):
+                    ok(f"views.open resolves ({len(rows)} row{'' if len(rows) == 1 else 's'}, all {prefix}- and not Done)")
+                continue
             if k != "road":
-                # The other six are shared across projects by design, so they may be
+                # The other seven are shared across projects by design, so they may be
                 # empty and may hold other prefixes. Resolving is all they owe.
                 ok(f"views.{k} resolves ({len(rows)} row{'' if len(rows) == 1 else 's'})")
                 continue

@@ -17,6 +17,37 @@ enforces it; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
+## 0.14.0 — 2026-11-15
+
+**Board reads stop growing with the project's Done history.** (LC-30)
+
+- **Why.** The road view filters only on Project, so every Done story stays in it
+  forever. On this project's board one read of it was 193,380 characters for 47
+  rows, 44 of them Done, and `/lc:done`'s unblock step paged the whole board view -
+  six pages, over two million characters - to find the few rows naming a blocker.
+  Both grew with every story closed.
+- **New per-project view `open`** (Project is this one, Status is not Done), in
+  `board.json`, provisioned by `/lc:init` and `/lc:plan` (`plan.py config` now takes
+  `--open`), printed by `init.py views --open`. `/lc:start` finds its story there
+  and `/lc:reconcile` audits from it. Measured: about 8,000 characters, one page.
+- **New shared view `dependents`** (Status is not Done, Blocked by is not empty,
+  every project). `/lc:done` and `/lc:reconcile` read it to find what a closed story
+  unblocks: 172,178 characters in one page. Closing a story shrinks both views.
+  `board.json` filters gain `is_not_empty`, which `boardcheck.py` writes as
+  `IS NOT EMPTY` and reads back from Notion's value-less leaf.
+- **Unchanged on purpose:** `/lc:groom`'s ID allocation and duplicate check, and
+  `/lc:doctor`'s duplicate-ID check, still read the road. They must see every ID
+  ever issued, Done ones included, or an ID gets issued twice. `/lc:plan`'s
+  prefix check still reads the unfiltered `board`.
+- **Older boards.** `/lc:doctor` fails a config without `views.open` or
+  `views.dependents` and names the view to create, with its exact `configure`
+  line; `dependents` is created once per board and its URL added to every repo
+  config on it. Until then each command says so and falls back to the old read.
+  Doctor also reads `open` in full and fails a row from another project or a Done
+  row.
+
+---
+
 ## 0.13.0 — 2026-11-15
 
 **`/lc:mine` projects an in-flight clock from the day it started, not from today.** (LC-29)

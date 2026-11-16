@@ -30,7 +30,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SKILLS = os.path.join(REPO, "plugins", "lc", "skills")
 INIT = os.path.join(SKILLS, "init", "init.py")
 BOARD = os.path.join(SKILLS, "init", "board.json")
-SHARED = ("ready", "inProgress", "inReview", "waitingExternal", "yourTurn", "board")
+SHARED = ("ready", "inProgress", "inReview", "waitingExternal", "yourTurn", "board", "dependents")
 
 
 def hx(label):
@@ -56,7 +56,7 @@ def load_board():
 PROJECTS_DB, STORIES_DB = hx("projects-db"), hx("stories-db")
 PROJECTS_DS, STORIES_DS = dashed(hx("projects-ds")), dashed(hx("stories-ds"))
 PROJECT_PAGE = f"https://www.notion.so/{hx('project-row')}"
-PER_PROJECT = ("road", "next")
+PER_PROJECT = ("road", "next", "open")
 VIEW_IDS = {k: hx(f"view-{k}") for k in SHARED + PER_PROJECT}
 
 
@@ -71,6 +71,7 @@ def state():
         "project": PROJECT_PAGE,
         "road": f"https://www.notion.so/{STORIES_DB}?v={VIEW_IDS['road']}",
         "next": f"https://www.notion.so/{STORIES_DB}?v={VIEW_IDS['next']}",
+        "open": f"https://www.notion.so/{STORIES_DB}?v={VIEW_IDS['open']}",
     }
 
 
@@ -91,6 +92,9 @@ def leaf(prop, op, value, board):
     """One board.json filter as a Notion advancedFilter leaf."""
     types = {p["name"]: p["type"] for p in board["stories"]["properties"]}
     t = types[prop]
+    if op in ("is_empty", "is_not_empty"):
+        # As a live board stores it (2026-11-15): the operator alone, no value.
+        return {"type": "property", "property": prop, "propertyType": t, "operator": op}
     if t == "checkbox":
         return {"type": "property", "property": prop, "propertyType": "checkbox",
                 "operator": "checkbox_is", "value": {"type": "exact", "value": value}}
@@ -153,7 +157,7 @@ def write_fetch(path, obj, saved):
 class Board:
     """A fetch pair that matches board.json exactly; tests break it one thing at a time."""
 
-    def __init__(self, with_road=True, with_next=True):
+    def __init__(self, with_road=True, with_next=True, with_open=True):
         self.spec = load_board()
         ds = {"projects": PROJECTS_DS, "stories": STORIES_DS}
         self.projects_schema = schema_of(self.spec["projects"], ds)
@@ -165,6 +169,9 @@ class Board:
         if with_next:
             nxt = dict(self.spec["next"], name="Next — test")
             self.views[VIEW_IDS["next"]] = view_config(nxt, self.spec, PROJECT_PAGE)
+        if with_open:
+            opn = dict(self.spec["open"], name="Open — test")
+            self.views[VIEW_IDS["open"]] = view_config(opn, self.spec, PROJECT_PAGE)
 
     def write(self, tmp, saved=False, st=None):
         sp = os.path.join(tmp, "state.json")
@@ -292,6 +299,31 @@ class Views(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual([v["key"] for v in json.loads(r.stdout)], ["road", "next"])
 
+    def test_open_view_is_this_projects_stories_that_are_not_done(self):
+        """LC-30: /lc:start and /lc:reconcile read this view instead of the road, which
+        keeps every Done row forever. Scoped to the project and filtered off Done."""
+        r = run(INIT, "views", "--open", "--key", "my-app", "--project-url", PROJECT_PAGE)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        views = json.loads(r.stdout)
+        self.assertEqual([v["key"] for v in views], ["open"])
+        self.assertEqual(views[0]["name"], "Open — my-app")
+        self.assertEqual(views[0]["configure"].split("; ")[:2],
+                         [f'FILTER "Project" = "{PROJECT_PAGE}"', 'FILTER "Status" != "Done"'])
+
+    def test_road_still_holds_done_rows(self):
+        """The trap LC-30 named: ID allocation and the duplicate check read the road, so
+        it must never be filtered off Done, or a Done story's ID is issued again."""
+        road = load_board()["road"]
+        self.assertEqual([f[0] for f in road["filters"]], ["Project"])
+
+    def test_dependents_view_is_every_projects_open_blocked_stories(self):
+        """LC-30: what /lc:done reads to find what a closed story unblocks. Board-wide
+        (a clock blocks across projects), but only open rows that name a blocker."""
+        by = {v["key"]: v for v in json.loads(run(INIT, "views").stdout)}
+        self.assertEqual(by["dependents"]["configure"].split("; ")[:2],
+                         ['FILTER "Status" != "Done"', 'FILTER "Blocked by" IS NOT EMPTY'])
+        self.assertNotIn("Project", by["dependents"]["configure"].split("; SORT")[0])
+
     def test_next_view_needs_key_and_project_url(self):
         r = run(INIT, "views", "--next", "--project-url", PROJECT_PAGE)
         self.assertNotEqual(r.returncode, 0)
@@ -299,6 +331,30 @@ class Views(unittest.TestCase):
 
 
 class Check(unittest.TestCase):
+    def test_dependents_without_its_blocked_by_filter_is_named(self):
+        """Without it the view is every open row on the board - correct, but the read
+        LC-30 shrank grows back. The emptiness leaf has no value; both halves are checked."""
+        with tempfile.TemporaryDirectory() as tmp:
+            b = Board()
+            b.views[VIEW_IDS["dependents"]]["advancedFilter"]["filters"].pop(1)
+            r = b.check(tmp)
+        self.assertEqual(r.returncode, 1, r.stdout)
+        f = fails(r)
+        self.assertEqual(len(f), 1, f)
+        self.assertTrue(f[0].startswith("views.dependents ('Waiting on a blocker'): filter is"), f[0])
+        self.assertIn('FILTER "Blocked by" IS NOT EMPTY', f[0])
+
+    def test_open_view_that_lost_its_status_filter_is_named(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            b = Board()
+            b.views[VIEW_IDS["open"]]["advancedFilter"]["filters"].pop(1)
+            r = b.check(tmp)
+        self.assertEqual(r.returncode, 1, r.stdout)
+        f = fails(r)
+        self.assertEqual(len(f), 1, f)
+        self.assertTrue(f[0].startswith("views.open ('Open — test'): filter is"), f[0])
+        self.assertIn('FILTER "Status" != "Done"', f[0])
+
     def test_matching_board_passes_inline_and_saved(self):
         for saved in (False, True):
             with self.subTest(saved=saved), tempfile.TemporaryDirectory() as tmp:

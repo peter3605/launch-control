@@ -55,7 +55,7 @@ does not create any (see [decision 0001](decisions/0001-native-tasks.md)); add
 
 ## Views
 
-Eight, each answering one question. Every one is referenced by name in
+Ten, each answering one question. Every one is referenced by name in
 `launch-control.json`.
 
 | Key | Filter | Read by |
@@ -65,9 +65,11 @@ Eight, each answering one question. Every one is referenced by name in
 | `inProgress` | Status is `In Progress` | `/lc:status` |
 | `inReview` | Status is `In Review` | `/lc:status` |
 | `waitingExternal` | Gating is `External`, not Done | `/lc:status` |
-| `road` | **Project is this one.** One per project | `/lc:reconcile`, `/lc:start`, `/lc:groom` |
+| `road` | **Project is this one**, Done rows included. One per project | `/lc:groom` (ID allocation and its duplicate check), `/lc:doctor` (duplicate IDs), `/lc:plan` |
 | `next` | **Project is this one**, Status is `Ready` **and** Agent can do this is checked. One per project | `/lc:next` |
-| `board` | Grouped by Status, for reading | — |
+| `open` | **Project is this one**, Status is not `Done`. One per project | `/lc:start`, `/lc:reconcile` |
+| `dependents` | Status is not `Done` **and** Blocked by is not empty, every project | `/lc:done` and `/lc:reconcile`, to find what a closed story unblocks |
+| `board` | Grouped by Status, unfiltered, every project | `/lc:plan` (is a prefix free?) |
 
 ### Why `road` is per-project and not one shared view
 
@@ -90,6 +92,24 @@ every Done row too. So each project gets a second view of its own, filtered the 
 
 `/lc:mine` reads `yourTurn` across every project on purpose and was left alone: a
 clock in one project can block another, so its chains need the whole board.
+
+### Why `open` and `dependents` exist, and what still reads `road`
+
+The road keeps every Done row forever. On this project's own board, with 47 stories
+of which 44 were Done, one read of it returned 193,380 characters, and `/lc:done`'s
+unblock step paged the whole `board` view - six pages, over two million characters -
+to find the handful of rows that name a blocker (LC-30, 2026-11-15). Both reads grew
+with every story closed. So the reads that never need a Done row moved to views that
+leave them out: finding a story to start or to audit reads `open`, and finding what a
+closed story unblocks reads `dependents`, which is board-wide because a clock in one
+project can block another. Measured on the same board: `open` returned about 8,000
+characters and `dependents` 172,178 in one page, and closing a story shrinks both.
+
+Two reads **must** see Done rows and stay on `road`: `/lc:groom`'s ID allocation
+(`ids.py next`), which would otherwise hand out a number a Done story already carries,
+and the duplicate-ID checks in `/lc:groom` and `/lc:doctor`. `/lc:plan` reads `road`
+too, on a project it has just created. Whether a prefix is free is asked of the
+unfiltered `board`, for the same reason.
 
 ### Why `yourTurn` has no Type filter
 
