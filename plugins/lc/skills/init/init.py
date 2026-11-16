@@ -47,11 +47,10 @@ from doctor import load_json, git  # noqa: E402
 # board to the same contract. It lives in its own module so neither script imports
 # the other for it.
 from boardcheck import (spec, hex_id, view_id, ds_uuid, configure, repair, PROJECT_VIEWS,  # noqa: E402
-                        project_view_spec,
+                        project_view_spec, column,
                         fetch_text, parse_views, parse_database, check_properties, check_view)
 
 SHARED_VIEWS = ("ready", "inProgress", "inReview", "waitingExternal", "yourTurn", "board")
-DDL_TYPES = {"title": "TITLE", "text": "RICH_TEXT", "number": "NUMBER", "checkbox": "CHECKBOX"}
 # Standing notes every config carries, so a session reading only the config knows
 # the traps. The same wording the example config ships with.
 NOTES = {
@@ -83,10 +82,6 @@ def finish(clean_msg="Clean."):
         return 1
     print(clean_msg)
     return 0
-
-
-def sql(s):
-    return "'" + str(s).replace("'", "''") + "'"
 
 
 def save_json(path, data):
@@ -138,21 +133,6 @@ def cmd_preflight(args):
 
 
 # --------------------------------------------------------------------- ddl
-def column(p, ds):
-    t = p["type"]
-    if t in DDL_TYPES:
-        out = DDL_TYPES[t]
-    elif t == "select":
-        out = "SELECT(" + ", ".join(f"{sql(n)}:{c}" for n, c in p["options"]) + ")"
-    elif t == "relation":
-        out = f"RELATION({sql(ds[p['target']])}" + (f", DUAL {sql(p['dual'])}" if p.get("dual") else "") + ")"
-    else:
-        raise SystemExit(f"board.json: unsupported type {t!r} on {p['name']!r}")
-    if p.get("description"):
-        out += f" COMMENT {sql(p['description'])}"
-    return f'"{p["name"]}" {out}'
-
-
 def cmd_ddl(args):
     s = spec()
     if args.what == "projects":

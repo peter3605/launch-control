@@ -196,6 +196,21 @@ class BoardSchema(unittest.TestCase):
                 self.assertTrue(f[0].startswith("Stories: property 'Estimate' is missing - "), f[0])
                 self.assertIn(f"init.py ddl stories --projects-ds collection://{PROJECTS_DS}", f[0])
 
+    def test_a_board_without_started_is_told_the_exact_column_to_add(self):
+        """LC-29 added Started to board.json. A board provisioned before it fails
+        with the one statement that brings it up to date, not just a pointer."""
+        for saved in (False, True):
+            with self.subTest(saved=saved), tempfile.TemporaryDirectory() as tmp:
+                b = Board()
+                del b.stories_schema["Started"]
+                r = doctor(b, tmp, saved=saved)
+                self.assertEqual(r.returncode, 1, r.stdout)
+                f = fails(r)
+                self.assertEqual(len(f), 1, f)
+                self.assertTrue(f[0].startswith("Stories: property 'Started' is missing - "), f[0])
+                self.assertIn("update-data-source on stories.dataSource with "
+                              "`ADD COLUMN \"Started\" DATE COMMENT 'the day an External clock was started", f[0])
+
     def test_lost_projects_select_option_is_named(self):
         with tempfile.TemporaryDirectory() as tmp:
             b = Board()

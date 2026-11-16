@@ -91,6 +91,24 @@
       "url": "https://app.notion.com/p/5a3b1e00000000000000000000000008"
     },
     {
+      "Story ID": "HX-11",
+      "Name": "Register the company for a D-U-N-S number",
+      "Status": "In Progress",
+      "Type": "Launch Blocker",
+      "Gating": "External",
+      "Agent can do this": "__NO__",
+      "Estimate": "XS",
+      "Lead time": "Dun & Bradstreet quote up to 30 days for a new registration",
+      "Lead days min": 5,
+      "Lead days max": 30,
+      "Started": "2026-08-26",
+      "Blocked by": [],
+      "Project": [
+        "https://app.notion.com/p/5a3b1e00000000000000000000000000"
+      ],
+      "url": "https://app.notion.com/p/5a3b1e0000000000000000000000000b"
+    },
+    {
       "Story ID": "HX-06",
       "Name": "Rotate both partner API keys, then deploy",
       "Status": "Ready",

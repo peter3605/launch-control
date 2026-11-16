@@ -33,8 +33,8 @@ python3 plugins/lc/skills/mine/mine.py --view examples/sample-board.json
 You need only `python3`: no Notion, no plugin, no Claude Code.
 [`examples/sample-board.json`](examples/sample-board.json) is an anonymised
 **Your turn** view for a made-up iOS app. It has a long partner-approval clock, an
-App Store submission waiting on two other clocks, a clock nobody has given lead
-days yet, and two items on your desk. The script prints the same three sections
+App Store submission waiting on two other clocks, a D-U-N-S registration already
+three weeks in, a clock nobody has given lead days yet, and two items on your desk. The script prints the same three sections
 `/lc:mine` shows you: **CLOCKS**, **YOUR DESK** and **START TODAY**.
 
 The finish dates count from today, so they change every day you run it. Add
@@ -155,6 +155,21 @@ START TODAY
 
 The API-approval clock heads the list, and the release can't finish before it does.
 The two zero-lead Apple tasks look urgent, but they have five weeks of slack.
+
+**A clock already running is projected from the day it started.** `/lc:start` sets
+**Started** on an External story when it is claimed, and `/lc:mine` takes the days
+since then off its lead: each bound becomes `max(0, lead - days since Started)`. The
+sample board's D-U-N-S registration, started three weeks before `--today 2026-09-16`
+with a 5-30 day lead, has at most 9 days left, not 30:
+
+```
+  HX-11    lead    5-30  earliest finish 2026-09-16 .. 2026-09-25  [In Progress, started 2026-08-26, 21 days in]
+           Register the company for a D-U-N-S number
+```
+
+Past its max, the row says `earliest finish overdue` and how far past it is, rather
+than printing a date in the past. A running clock with no Started is still projected
+from today, and its row says so.
 
 ## The other half: a story is Done when it is checked
 
@@ -513,7 +528,7 @@ opening a PR. See [`docs/config-reference.md`](docs/config-reference.md).
 
 ## Status
 
-v0.12.0: pre-1.0, extracted from a working setup that manages five projects. The
+v0.13.0: pre-1.0, extracted from a working setup that manages five projects. The
 board is provisioned by `/lc:init`; projects on it are provisioned by `/lc:plan`.
 
 What this is *not* is a tracker for the steps inside a story. Keep those wherever

@@ -45,7 +45,7 @@ sys.dont_write_bytecode = True  # importing boardcheck must not litter the insta
 # boardcheck imports nothing from here or from init.py, so this is not a cycle even
 # though init.py imports this file.
 from boardcheck import (spec, unwrap_saved, hex_id, ds_uuid, configure, repair, PROJECT_VIEWS,  # noqa: E402
-                        project_view_spec,
+                        project_view_spec, column,
                         parse_database, check_properties, check_view)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -241,9 +241,13 @@ def check_schema(cfg, stories_path, projects_path):
         # A lost property is fixed on the board; init.py ddl prints its definition.
         ddl = (f"python3 {INIT_PY} ddl projects" if k == "projects"
                else f"python3 {INIT_PY} ddl stories --projects-ds {ds_urls['projects'] or '<projects data source>'}")
+        targets = {t: ds_uuid(ds_urls[t]) or f"<{t} data source>" for t in ("projects", "stories")}
         check_properties(s[k]["title"], s[k], parsed[k][0], ds_urls, ok,
                          lambda m, ddl=ddl: fail(f"{m} - fix it on the board to match board.json; "
-                                                 f"`{ddl}` prints every property's definition"))
+                                                 f"`{ddl}` prints every property's definition"),
+                         missing_fix=lambda p, k=k, targets=targets: (
+                             f"add it by running update-data-source on {k}.dataSource with "
+                             f"`ADD COLUMN {column(p, targets)}`"))
     if "stories" not in parsed:
         return
 
