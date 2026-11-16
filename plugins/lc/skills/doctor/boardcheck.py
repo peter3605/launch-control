@@ -56,6 +56,10 @@ def dsl_value(v):
     return f'"{v}"'
 
 
+# board.json's emptiness operators, which take no value, as the view DSL spells them.
+EMPTINESS = {"is_empty": "IS EMPTY", "is_not_empty": "IS NOT EMPTY"}
+
+
 def configure(v):
     """A board.json view as the view DSL's configure line.
 
@@ -67,6 +71,9 @@ def configure(v):
     2026-11-15 (docs/troubleshooting.md)."""
     parts = [] if v["filters"] else ["CLEAR FILTER"]
     for prop, op, value in v["filters"]:
+        if op in EMPTINESS:
+            parts.append(f'FILTER "{prop}" {EMPTINESS[op]}')
+            continue
         # For a relation, = means contains in the view DSL.
         parts.append(f'FILTER "{prop}" {"!=" if op == "is_not" else "="} {dsl_value(value)}')
     if v.get("groupBy"):
@@ -89,9 +96,11 @@ def repair(v):
 
 
 # The views each project gets for itself, filtered on its own Projects row. `road`
-# is every story in the project; `next` is its Ready, agent-doable ones, which is
-# what /lc:next reads.
-PROJECT_VIEWS = ("road", "next")
+# is every story in the project, Done ones included, for the reads that must see
+# every ID ever issued; `next` is its Ready, agent-doable ones, which is what
+# /lc:next reads; `open` is its stories that are not Done, which is what /lc:start
+# and /lc:reconcile read, so they do not grow with the project's history (LC-30).
+PROJECT_VIEWS = ("road", "next", "open")
 
 
 def project_view_spec(which, key, project_url, s=None):
@@ -240,6 +249,9 @@ def canonical(leaf):
         return (prop, "is", not value)
     if op == "relation_contains":
         return (prop, "contains", hex_id(value))
+    if op in EMPTINESS:
+        # Notion stores these with no value at all (seen on a live board, 2026-11-15).
+        return (prop, op, None)
     return (prop, op, json.dumps(value))
 
 
@@ -250,7 +262,9 @@ def check_view(key, want, url, views, ok, fail):
         return
     try:
         leaves = flatten(got.get("advancedFilter") or {"type": "group", "operator": "and", "filters": []})
-        leaves += [f["filter"] for f in got.get("simpleFilters") or [] if (f.get("filter") or {}).get("value", {}).get("value") is not None]
+        leaves += [f["filter"] for f in got.get("simpleFilters") or []
+                   if (f.get("filter") or {}).get("operator") in EMPTINESS
+                   or ((f.get("filter") or {}).get("value") or {}).get("value") is not None]
         have = sorted(map(canonical, leaves), key=repr)
     except ValueError as e:
         fail(f"views.{key}: filter has {e}, which no Launch Control view uses")

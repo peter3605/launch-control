@@ -5,9 +5,10 @@
     init.py ddl projects                               CREATE TABLE for Projects
     init.py ddl stories --projects-ds DS               CREATE TABLE for Stories
     init.py ddl blocked-by --stories-ds DS             the self-relation, added after create
-    init.py views                                      the six shared views, as JSON
+    init.py views                                      the seven shared views, as JSON
     init.py views --road --key KEY --project-url URL   this project's road view, as JSON
     init.py views --next --key KEY --project-url URL   this project's next view, as JSON
+    init.py views --open --key KEY --project-url URL   this project's open view, as JSON
     init.py record --state STATE --key KEY --url URL [--data-source DS]
     init.py check --state STATE --stories FILE --projects FILE [--view FILE ...]
     init.py board --state STATE --out FILE             a board file for plan.py config --from
@@ -21,7 +22,7 @@ board.json is the board. The DDL and view configs are generated from it, and
 created and what is verified cannot drift apart.
 
 STATE is this run's ledger ({"hub", "projects", "stories", "blockedBy", "views":
-{key: url}, "project", "road", "next"}). It is what makes a failed run resumable instead of
+{key: url}, "project", "road", "next", "open"}). It is what makes a failed run resumable instead of
 a second board, and it lives in .claude/lc-init/, which ignores itself: it holds
 Notion IDs, and in a public repo those stay out of history.
 
@@ -50,13 +51,13 @@ from boardcheck import (spec, hex_id, view_id, ds_uuid, configure, repair, PROJE
                         project_view_spec, column,
                         fetch_text, parse_views, parse_database, check_properties, check_view)
 
-SHARED_VIEWS = ("ready", "inProgress", "inReview", "waitingExternal", "yourTurn", "board")
+SHARED_VIEWS = ("ready", "inProgress", "inReview", "waitingExternal", "yourTurn", "board", "dependents")
 # Standing notes every config carries, so a session reading only the config knows
 # the traps. The same wording the example config ships with.
 NOTES = {
     "note": "Prefer querying data sources in VIEW mode - it is unmetered on the free Notion plan. SQL mode is billed.",
     "dependencies": "'Blocked by' is a RELATION (pass page URLs, not story IDs). Resolve blockers by fetching the linked pages. Status=Ready already means unblocked.",
-    "viewContract": "Every project has its own 'road' view, filtered to that project and nothing else. Commands MUST scope by views.road - never by a shared browse view, whose filters anyone can change in the Notion UI.",
+    "viewContract": "Every project has its own 'road', 'open' and 'next' views, filtered to that project and nothing else. Commands MUST scope by them - never by a shared browse view, whose filters anyone can change in the Notion UI. Only the road holds Done rows; read it only where every ID ever issued matters (ID allocation, duplicate checks).",
 }
 
 problems = []
@@ -298,12 +299,13 @@ def main():
     c = sub.add_parser("views")
     c.add_argument("--road", action="store_true")
     c.add_argument("--next", action="store_true")
+    c.add_argument("--open", action="store_true")
     c.add_argument("--key")
     c.add_argument("--project-url")
 
     c = sub.add_parser("record")
     c.add_argument("--state", required=True)
-    c.add_argument("--key", required=True, help="hub, projects, stories, blockedBy, views.<key>, project, road, next")
+    c.add_argument("--key", required=True, help="hub, projects, stories, blockedBy, views.<key>, project, road, next, open")
     c.add_argument("--url", required=True)
     c.add_argument("--data-source")
 

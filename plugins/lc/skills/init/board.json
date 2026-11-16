@@ -69,7 +69,12 @@
      "filters": [],
      "groupBy": "Status",
      "sorts": [["Seq", "ASC"]],
-     "show": ["Story ID", "Project", "Estimate", "Gating", "Name"]}
+     "show": ["Story ID", "Project", "Estimate", "Gating", "Name"]},
+    {"key": "dependents", "name": "Waiting on a blocker", "type": "table",
+     "_comment": "What /lc:done and /lc:reconcile read to find what a closed story unblocks: every project's open stories that name a blocker, and nothing else. Board-wide, because a clock in one project can block a story in another. Done rows are filtered out so the read does not grow with the board's history - it used to page the whole board view, Done rows and all (LC-30).",
+     "filters": [["Status", "is_not", "Done"], ["Blocked by", "is_not_empty", null]],
+     "sorts": [["Seq", "ASC"]],
+     "show": ["Story ID", "Status", "Blocked by", "Project", "Name"]}
   ],
   "road": {"key": "road", "name": "Road — {key}", "type": "table",
            "filters": [["Project", "contains", "{project_url}"]],
@@ -79,5 +84,10 @@
            "_comment": "What /lc:next reads: this project's Ready, agent-doable stories and nothing else. The shared ready view holds every project's, so on a board with several projects one read of it overflowed the tool's output limit (LC-28).",
            "filters": [["Project", "contains", "{project_url}"], ["Status", "is", "Ready"], ["Agent can do this", "is", true]],
            "sorts": [["Seq", "ASC"]],
-           "show": ["Name", "Story ID", "Estimate", "Epic", "Blocked by", "Done when", "Notes and traps"]}
+           "show": ["Name", "Story ID", "Estimate", "Epic", "Blocked by", "Done when", "Notes and traps"]},
+  "open": {"key": "open", "name": "Open — {key}", "type": "table",
+           "_comment": "This project's stories that are not Done: what /lc:start and /lc:reconcile read. The road keeps every Done row forever, so reading it grew with the project's history - 193,380 characters for 47 rows, 44 of them Done (LC-30). Anything that must see Done rows - ID allocation, the duplicate-ID check - still reads the road.",
+           "filters": [["Project", "contains", "{project_url}"], ["Status", "is_not", "Done"]],
+           "sorts": [["Seq", "ASC"]],
+           "show": ["Name", "Story ID", "Status", "Seq", "Blocked by"]}
 }
