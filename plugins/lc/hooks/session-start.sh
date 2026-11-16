@@ -62,7 +62,8 @@ if cur:
         "Before doing anything else, fetch that story and re-read its **Done when** and "
         "**Notes and traps** fields. When the work is finished, run `/lc:done` so it is "
         "ticked off and the next stories are unblocked. Put the story ID in every commit "
-        "subject.",
+        "subject. If the story is being dropped unfinished, `/lc:release <reason>` puts "
+        "it back on the board and unbinds the session without shipping anything.",
     ]
 else:
     lines += [

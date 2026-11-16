@@ -350,6 +350,7 @@ See [config-reference.md](config-reference.md) for the whole `git` block.
 /lc:status     where every project stands
 /lc:reconcile  re-audit the board against the repo; evidence required to close anything
 /lc:doctor     check the config has not silently regressed
+/lc:release    drop the bound story unshipped; the branch stays
 ```
 
 `/lc:mine` is the one to look at next, and the one nothing else does. It splits

@@ -38,6 +38,7 @@ What the suite covers today:
 | `tests/test_mutation_guard.py` | That `test_mine.py`, `test_init.py`, `test_plan.py`, `test_doctor.py` and `test_ids.py` would actually go red if what they pin broke. A mutation that slips through fails here |
 | `tests/test_version_sync.py` | The version check, demonstrated failing and passing |
 | `tests/test_setup.py` | `setup.sh` parses under bash 3.2, and its dry run writes nothing |
+| `tests/test_hooks.py` | The Stop hook nudges once per bound story and never on an empty binding (what `/lc:release` leaves), both hooks parse under `/bin/bash`, and the README Commands table lists every skill |
 
 Tests live at the repo root, never under `plugins/lc/`. The plugin directory is
 copied wholesale into every installed repo and its users do not want this suite.

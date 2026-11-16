@@ -26,6 +26,8 @@ print(json.dumps({
         f"criteria, tick it off, record what this session did, and unblock anything "
         f"waiting on it.\n\n"
         f"If the work is NOT finished, say so in one line and stop. Do not mark it Done. "
+        f"If it is being dropped rather than paused, /lc:release puts it back on the "
+        f"board and unbinds the session, leaving the branch in place. "
         f"This nudge fires only once per story, so stopping now is fine."
     ),
 }))
