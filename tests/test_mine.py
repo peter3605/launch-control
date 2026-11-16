@@ -425,6 +425,70 @@ def u_id(sid):
     return mine.page_id(u(sid))
 
 
+class InlinePage(unittest.TestCase):
+    """LC-B16: an inline page of Your turn is given in a short checked form, never
+    re-typed whole into a file."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+
+    def run_mine(self, saved_rows, inline):
+        argv = ["mine.py", "--today", TODAY]
+        if saved_rows is not None:
+            p = os.path.join(self.tmp.name, "view.json")
+            with open(p, "w") as f:
+                json.dump({"results": saved_rows, "has_more": True}, f)
+            argv += ["--view", p]
+        q = os.path.join(self.tmp.name, "inline.json")
+        with open(q, "w") as f:
+            f.write(inline if isinstance(inline, str) else json.dumps(inline))
+        argv += ["--inline", q]
+        buf, old = io.StringIO(), sys.argv
+        sys.argv = argv
+        try:
+            with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(io.StringIO()):
+                code = mine.main()
+        finally:
+            sys.argv = old
+        return code, buf.getvalue()
+
+    def test_saved_pages_plus_an_inline_last_page_rank_as_one_board(self):
+        """The chain crosses the page boundary: EF-1 is saved, EF-2 waits on it inline."""
+        code, out = self.run_mine([clock("EF-1", 3, 5)],
+                                  {"count": 1, "hasMore": False, "rows": [clock("EF-2", 2, 2, blocked_by=["EF-1"])]})
+        self.assertEqual(code, 0, out)
+        self.assertIn("EF-2", out)
+        self.assertIn("2026-01-06 .. 2026-01-08", out)  # 3-5 days then 2: finish 5..7 from 2026-01-01
+
+    def test_a_whole_read_inline_needs_no_view_file(self):
+        code, out = self.run_mine(None, {"count": 1, "hasMore": False, "rows": [clock("EF-1", 3, 5)]})
+        self.assertEqual(code, 0, out)
+        self.assertIn("2026-01-04 .. 2026-01-06", out)
+
+    def test_malformed_inline_pages_fail_loudly(self):
+        good = clock("EF-1", 3, 5)
+        cases = [
+            ({"count": 2, "hasMore": False, "rows": [good]}, "count 2 but gives 1"),
+            ({"hasMore": False, "rows": [good]}, "needs `count`"),
+            ({"count": 1, "rows": [good]}, "needs `hasMore`"),
+            ({"count": 1, "hasMore": False, "rows": [dict(good, **{"Notes and traps": "x"})]}, "unexpected key(s) Notes and traps"),
+            ({"count": 1, "hasMore": False, "rows": [dict(good, url="EF-1")]}, "no Notion page id"),
+            ({"count": 1, "hasMore": False, "rows": [dict(good, Status="Waiting")]}, "Status 'Waiting'"),
+            ({"count": 1, "hasMore": False, "rows": [dict(good, Gating="Outside")]}, "Gating 'Outside'"),
+            ({"count": 1, "hasMore": False, "rows": [dict(good, **{"Lead days max": "ten"})]}, "is not a number"),
+            ({"count": 1, "hasMore": False, "rows": [dict(good, **{"Blocked by": ["EF-0"]})]}, "Blocked by must be"),
+            ('{"count": 1, "hasMore": false, "rows": [{"Story ID"', "not valid JSON"),
+        ]
+        for inline, needle in cases:
+            with self.subTest(needle=needle):
+                code, out = self.run_mine(None, inline)
+                self.assertEqual(code, 1, out)
+                self.assertIn("FAIL", out)
+                self.assertIn(needle, out)
+                self.assertNotIn("START TODAY", out)
+
+
 if __name__ == "__main__":
     unittest.main()
 
