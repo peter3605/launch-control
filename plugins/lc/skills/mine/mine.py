@@ -1,11 +1,23 @@
 #!/usr/bin/env python3
 """Launch Control - rank the work only a human can do by what waiting costs.
 
-    mine.py --view FILE [--view FILE ...] [--prefix APP] [--today YYYY-MM-DD]
+    mine.py --view FILE [--view FILE ...] [--inline FILE] [--prefix APP] [--today YYYY-MM-DD]
 
-Each FILE is one page of a view-mode query of the Your turn view, as the tool
-returned it: a JSON object with a "results" list, or the list of content blocks
-the tool saves a large result as. Pass every page.
+Each --view FILE is one page of a view-mode query of the Your turn view that the
+tool saved to disk: a JSON object with a "results" list, or the list of content
+blocks the tool saves a large result as. Pass every page.
+
+A page that came back inline is not re-typed whole. --inline FILE holds it in a
+short form, only the fields this script reads, with the row count stated:
+
+    {"count": 2, "hasMore": false, "rows": [
+      {"Story ID": "APP-3", "Name": "...", "Status": "Ready", "Gating": "External",
+       "Estimate": "S", "Lead days min": 3, "Lead days max": 10, "Lead time": "...",
+       "Blocked by": ["https://..."], "url": "https://..."}, ...]}
+
+`count` is checked against `rows`, and a key outside that list, a URL with no
+page id, an unknown Status or Gating, or a lead day that is not a number fails
+loudly (exit 1) rather than ranking a board with a row missing or misread.
 
 Exits 1 if the rows cannot be ranked honestly (a dependency cycle, or no rows),
 0 otherwise. Rows it cannot rank are listed, never guessed.
@@ -75,6 +87,59 @@ def days(n):
 
 def span(lo, hi):
     return days(lo) if lo == hi else f"{days(lo)}-{days(hi)}"
+
+
+INLINE_KEYS = {"Story ID", "Name", "Status", "Gating", "Estimate", "Lead days min", "Lead days max",
+               "Lead time", "Blocked by", "url"}
+STATUSES = {"Backlog", "Ready", "In Progress", "Blocked", "In Review", "Done"}
+
+
+class InlineError(Exception):
+    pass
+
+
+def load_inline(path):
+    """The rows of an inline page, from the short form above. Every check is a way a
+    stated row goes wrong; each one refuses rather than ranks."""
+    try:
+        with open(path) as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        raise InlineError(f"--inline file not found: {path}") from None
+    except json.JSONDecodeError as e:
+        raise InlineError(f"--inline file is not valid JSON - truncated? {path} ({e.msg})") from None
+    if not isinstance(data, dict) or not isinstance(data.get("rows"), list):
+        raise InlineError(f"--inline file needs a `rows` list: {path}")
+    count = data.get("count")
+    if not isinstance(count, int) or isinstance(count, bool):
+        raise InlineError("--inline needs `count`, the number of rows the page held - without it a dropped row cannot be noticed")
+    if count != len(data["rows"]):
+        raise InlineError(f"--inline says count {count} but gives {len(data['rows'])} row(s) - state every row of the page")
+    if not isinstance(data.get("hasMore"), bool):
+        raise InlineError("--inline needs `hasMore`, true or false, as the page said")
+    if data["hasMore"]:
+        print(f"  WARN  {path} says hasMore - pass every page, or rows are missing", file=sys.stderr)
+    for i, r in enumerate(data["rows"], 1):
+        if not isinstance(r, dict):
+            raise InlineError(f"--inline row {i} is not an object")
+        label = f"--inline row {i} ({r.get('Story ID') or '?'})"
+        extra = sorted(set(r) - INLINE_KEYS)
+        if extra:
+            raise InlineError(f"{label}: unexpected key(s) {', '.join(extra)} - give only {', '.join(sorted(INLINE_KEYS))}")
+        if not page_id(r.get("url")):
+            raise InlineError(f"{label}: no Notion page id in url {r.get('url')!r}")
+        if r.get("Status") not in STATUSES:
+            raise InlineError(f"{label}: Status {r.get('Status')!r} is not one of {', '.join(sorted(STATUSES))}")
+        if r.get("Gating") not in ("Self-serve", "External", "", None):
+            raise InlineError(f"{label}: Gating {r.get('Gating')!r} is not Self-serve or External")
+        for k in ("Lead days min", "Lead days max"):
+            v = r.get(k)
+            if v not in (None, "") and (isinstance(v, bool) or not isinstance(v, (int, float))):
+                raise InlineError(f"{label}: {k} {v!r} is not a number (leave it out if blank)")
+        blockers = r.get("Blocked by", [])
+        if not isinstance(blockers, list) or not all(isinstance(b, str) and page_id(b) for b in blockers):
+            raise InlineError(f"{label}: Blocked by must be a list of Notion page URLs")
+    return data["rows"]
 
 
 def load(paths):
@@ -161,13 +226,22 @@ class Board:
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--view", action="append", required=True, help="a saved view-mode page of Your turn")
+    ap.add_argument("--view", action="append", default=[], help="a saved view-mode page of Your turn")
+    ap.add_argument("--inline", help="the page that came back inline, in the short form above")
     ap.add_argument("--prefix", help="narrow to one project's Story ID prefix")
     ap.add_argument("--today", help="YYYY-MM-DD, default today")
     args = ap.parse_args()
 
     today = datetime.date.fromisoformat(args.today) if args.today else datetime.date.today()
+    if not args.view and not args.inline:
+        ap.error("pass the saved pages with --view, an inline page with --inline, or both")
     rows = load(args.view)
+    if args.inline:
+        try:
+            rows += load_inline(args.inline)
+        except InlineError as e:
+            print(f"  FAIL  {e}")
+            return 1
     # Narrow after loading so a blocker in the view still counts, whoever owns it.
     # Bound unconditionally: shown() below used to dodge a NameError only because
     # `not args.prefix or ...` short-circuits first, which is one edit from a crash.

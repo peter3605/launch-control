@@ -17,6 +17,18 @@ enforces it; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
+## 0.12.0 — 2026-11-15
+
+**`/lc:mine` no longer asks for an inline view page to be re-typed.** (LC-B16)
+
+- **`mine.py --inline FILE`** takes a page of `yourTurn` that came back inline as
+  `{"count", "hasMore", "rows"}`, where each row has only the ten fields `mine.py`
+  reads. The count is checked, and an unexpected key, a URL with no page id, an
+  unknown Status or Gating, a non-numeric lead day or a malformed `Blocked by` exits
+  1 instead of ranking. `--view` is no longer required when the whole read was inline.
+- This was the last command still saying to write an inline result "verbatim", left
+  over from 0.11.0 (LC-B15).
+
 ## 0.11.0 — 2026-11-15
 
 **No command asks for an inline Notion result to be re-typed into a file.** (LC-B15)

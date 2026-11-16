@@ -513,7 +513,7 @@ opening a PR. See [`docs/config-reference.md`](docs/config-reference.md).
 
 ## Status
 
-v0.11.0: pre-1.0, extracted from a working setup that manages five projects. The
+v0.12.0: pre-1.0, extracted from a working setup that manages five projects. The
 board is provisioned by `/lc:init`; projects on it are provisioned by `/lc:plan`.
 
 What this is *not* is a tracker for the steps inside a story. Keep those wherever
