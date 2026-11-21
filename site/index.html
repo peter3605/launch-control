@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Launch Control</title>
+<meta name="description" content="A backlog for Claude Code that tracks the work your agent cannot do - D-U-N-S numbers, SES production access, App Store review - and tells you which clock to start today.">
+<meta property="og:title" content="Launch Control">
+<meta property="og:description" content="Your launch is waiting on a clock nobody started. A Claude Code backlog that ranks external lead times.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://peter3605.github.io/launch-control/">
+<meta name="color-scheme" content="light dark">
+<style>
+@font-face{font-family:"Archivo";src:url("fonts/archivo-var.woff2") format("woff2");font-weight:400 900;font-stretch:62% 125%;font-display:swap}
+@font-face{font-family:"IBM Plex Sans";src:url("fonts/ibmplexsans-var.woff2") format("woff2");font-weight:400 600;font-display:swap}
+@font-face{font-family:"IBM Plex Mono";src:url("fonts/ibmplexmono-400.woff2") format("woff2");font-weight:400;font-display:swap}
+@font-face{font-family:"IBM Plex Mono";src:url("fonts/ibmplexmono-500.woff2") format("woff2");font-weight:500;font-display:swap}
+@font-face{font-family:"IBM Plex Mono";src:url("fonts/ibmplexmono-600.woff2") format("woff2");font-weight:600;font-display:swap}
+html{-webkit-text-size-adjust:100%}
+body{margin:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+
+/* Layout: a launch planner's chart sheet. Cool drafting paper, ink, one launch-pad orange for the critical path. Wide-set display type, mono for every number. */
+:root{
+  --paper:#EDF0F2; --panel:#F8FAFB; --ink:#13202E; --muted:#56636F; --rule:#CBD2D8; --grid:#DDE3E8;
+  --signal:#D9501C; --signal-soft:rgba(217,80,28,.14); --go:#2A7A57; --term:#13202E; --term-fg:#DCE3E9; --term-dim:#8796A3;
+  --display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --body:"IBM Plex Sans",-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --wrap:1120px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#0E151C; --panel:#141D26; --ink:#E3E8ED; --muted:#93A0AC; --rule:#2A3642; --grid:#1C2630;
+  --signal:#FF7840; --signal-soft:rgba(255,120,64,.16); --go:#5BC28F; --term:#081016; --term-fg:#DCE3E9; --term-dim:#7F8E9B; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#0E151C; --panel:#141D26; --ink:#E3E8ED; --muted:#93A0AC; --rule:#2A3642; --grid:#1C2630;
+  --signal:#FF7840; --signal-soft:rgba(255,120,64,.16); --go:#5BC28F; --term:#081016; --term-fg:#DCE3E9; --term-dim:#7F8E9B; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font:16px/1.6 var(--body);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:32px 32px;background-attachment:fixed}
+.band{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:var(--wrap);margin:0 auto}
+a{color:inherit;text-decoration-color:var(--signal);text-underline-offset:3px}
+:focus-visible{outline:2px solid var(--signal);outline-offset:3px;border-radius:2px}
+code,.mono{font-family:var(--mono);font-size:.92em}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.02}
+h2{font-size:clamp(1.9rem,4.4vw,3rem);font-weight:800;font-stretch:112%;letter-spacing:-.01em}
+h3{font-size:1.15rem;font-weight:700;font-stretch:108%}
+p{margin:0}
+.eyebrow{font:600 .72rem/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.lede{font-size:1.12rem;color:var(--muted);max-width:62ch}
+
+/* top bar */
+.top{padding-block:18px;border-bottom:1px solid var(--rule);background:var(--paper)}
+.top .wrap{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.mark{display:flex;align-items:center;gap:10px;font:800 1rem/1 var(--display);font-stretch:125%;letter-spacing:.02em;text-transform:uppercase}
+.mark svg{flex:none}
+.top nav{display:flex;gap:20px;flex-wrap:wrap;font:500 .85rem/1 var(--mono)}
+.top nav a{text-decoration:none;color:var(--muted)}
+.top nav a:hover{color:var(--ink)}
+
+/* hero */
+.hero{padding-block:56px 40px}
+.hero h1{font-size:clamp(2.5rem,7.4vw,5.6rem);font-weight:900;font-stretch:118%;letter-spacing:-.025em;max-width:14ch}
+.hero h1 em{font-style:normal;color:var(--signal)}
+.hero .lede{margin-top:22px}
+.meta{margin-top:22px;display:flex;flex-wrap:wrap;gap:8px}
+.chip{font:500 .78rem/1 var(--mono);border:1px solid var(--rule);background:var(--panel);padding:7px 10px;border-radius:3px;color:var(--muted)}
+
+/* chart sheet */
+.sheet{margin-top:40px;background:var(--panel);border:1px solid var(--rule);border-radius:4px;box-shadow:0 1px 0 var(--rule),0 18px 40px -28px rgba(19,32,46,.35)}
+.sheet-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;padding:16px 20px;border-bottom:1px solid var(--rule)}
+.sheet-head .eyebrow b{color:var(--ink)}
+.chart-scroll{overflow-x:auto}
+.chart{min-width:680px;padding:12px 20px 8px;position:relative}
+.axis,.row{display:grid;grid-template-columns:230px 1fr;align-items:center}
+.axis .track{position:relative;height:26px;border-bottom:1px solid var(--rule)}
+.tick{position:absolute;bottom:0;transform:translateX(-50%);font:500 .68rem/1 var(--mono);color:var(--muted);padding-bottom:7px;white-space:nowrap}
+.tick::after{content:"";position:absolute;left:50%;bottom:-1px;height:5px;border-left:1px solid var(--rule)}
+.rows{position:relative}
+.row{min-height:52px;border-bottom:1px dashed var(--grid)}
+.label{appearance:none;background:none;border:0;color:inherit;text-align:left;font:inherit;padding:8px 12px 8px 0;display:flex;flex-direction:column;gap:2px;cursor:default}
+.label .id{font:600 .8rem/1.2 var(--mono)}
+.label .nm{font-size:.82rem;color:var(--muted);line-height:1.3}
+.label .dep{font:500 .68rem/1.2 var(--mono);color:var(--muted)}
+.label.pick{cursor:pointer}
+.label.pick .id::before{content:"";display:inline-block;width:9px;height:9px;border:1.5px solid var(--muted);border-radius:50%;margin-right:7px;vertical-align:-1px}
+.label.pick:hover .id{color:var(--signal)}
+.label.on .id{color:var(--signal)}
+.label.on .id::before{border-color:var(--signal);background:var(--signal)}
+.lane{position:relative;height:52px}
+.bar{position:absolute;top:16px;height:20px;display:flex;transition:left .45s cubic-bezier(.2,.7,.2,1)}
+.bar .solid{height:100%;background:var(--ink);border-radius:2px 0 0 2px;min-width:3px}
+.bar .range{height:100%;border:1.5px solid var(--ink);border-left:0;border-radius:0 2px 2px 0;
+  background:repeating-linear-gradient(135deg,transparent 0 4px,var(--rule) 4px 6px)}
+.bar.crit .solid{background:var(--signal)}
+.bar.crit .range{border-color:var(--signal);background:repeating-linear-gradient(135deg,transparent 0 4px,var(--signal-soft) 4px 7px)}
+.bar .wait{position:absolute;right:100%;top:9px;height:0;border-top:1.5px dotted var(--muted)}
+.bar .tag{position:absolute;left:calc(100% + 8px);top:2px;font:500 .7rem/1 var(--mono);color:var(--muted);white-space:nowrap}
+.launch{position:absolute;top:0;bottom:0;pointer-events:none;transition:left .45s cubic-bezier(.2,.7,.2,1),width .45s cubic-bezier(.2,.7,.2,1);
+  background:var(--signal-soft);border-right:2px solid var(--signal)}
+.launch span{position:absolute;right:6px;top:6px;font:600 .66rem/1 var(--mono);letter-spacing:.1em;color:var(--signal);white-space:nowrap}
+.controls{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:24px;padding:18px 20px 20px;border-top:1px solid var(--rule);align-items:center}
+.slider label{display:flex;justify-content:space-between;font:500 .8rem/1.3 var(--mono);color:var(--muted);margin-bottom:8px}
+.slider output{color:var(--ink);font-weight:600}
+input[type=range]{width:100%;accent-color:var(--signal)}
+.verdict{font-size:1rem;line-height:1.5;min-width:0}
+.verdict b{font-family:var(--mono);font-weight:600}
+.verdict .cost{display:inline-block;font:600 .78rem/1 var(--mono);padding:5px 8px;border-radius:3px;margin-right:8px;vertical-align:1px}
+.cost.zero{background:color-mix(in srgb,var(--go) 16%,transparent);color:var(--go)}
+.cost.hurt{background:var(--signal-soft);color:var(--signal)}
+.foot{padding:0 20px 16px;font:.72rem/1.5 var(--mono);color:var(--muted)}
+.legend{display:inline-flex;gap:14px;flex-wrap:wrap}
+.sw{display:inline-block;width:18px;height:9px;vertical-align:0;margin-right:5px}
+.sw.s{background:var(--ink)}
+.sw.r{border:1.2px solid var(--ink);background:repeating-linear-gradient(135deg,transparent 0 3px,var(--rule) 3px 5px)}
+
+/* sections */
+section.band{padding-block:84px}
+.sec-head{display:grid;gap:14px;margin-bottom:40px;max-width:760px}
+.split{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.half{background:var(--panel);border:1px solid var(--rule);border-radius:4px;padding:26px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.half .cmd{font:600 1.35rem/1 var(--mono);color:var(--signal)}
+.half ul{margin:0;padding-left:18px;color:var(--muted);display:grid;gap:6px}
+.half ul li::marker{color:var(--rule)}
+.half.dim .cmd{color:var(--ink)}
+
+.term{background:var(--term);color:var(--term-fg);border-radius:4px;overflow:hidden;border:1px solid var(--rule)}
+.term-bar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.08);font:500 .75rem/1 var(--mono);color:var(--term-dim)}
+.term pre{margin:0;padding:20px;overflow-x:auto;font:400 .8rem/1.55 var(--mono);tab-size:2}
+.term .h{color:#FFB08A;font-weight:600}
+.term .d{color:var(--term-dim)}
+.term .k{color:#fff;font-weight:600}
+.term .o{color:#FF8A57;font-weight:600}
+.annot{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;margin-top:22px}
+.annot div{border-top:2px solid var(--ink);padding-top:12px;display:grid;gap:6px;min-width:0}
+.annot div:first-child{border-color:var(--signal)}
+.annot p{color:var(--muted);font-size:.93rem}
+
+.ledger{border-top:2px solid var(--ink)}
+.ledger .ln{display:grid;grid-template-columns:150px minmax(0,1fr) minmax(0,1fr);gap:20px;padding:18px 0;border-bottom:1px solid var(--rule);align-items:start}
+.ledger .ln.hd{font:600 .7rem/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:12px 0}
+.ledger .who{font:600 .85rem/1.4 var(--mono)}
+.ledger .bad{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--signal);text-decoration-thickness:1.5px}
+.ledger .good code{background:var(--panel);border:1px solid var(--rule);padding:1px 6px;border-radius:3px;font-size:.85em}
+
+.loop{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;counter-reset:s;border:1px solid var(--rule);border-radius:4px;background:var(--panel);overflow:hidden}
+.loop li{list-style:none;padding:22px;border-right:1px solid var(--rule);display:grid;gap:8px;align-content:start;position:relative;min-width:0}
+.loop li:last-child{border-right:0}
+.loop li::before{counter-increment:s;content:counter(s,decimal-leading-zero);font:600 .72rem/1 var(--mono);color:var(--muted)}
+.loop code{font:600 1.02rem/1 var(--mono);color:var(--signal)}
+.loop p{color:var(--muted);font-size:.92rem}
+.loop-note{margin-top:14px;font:.82rem/1.5 var(--mono);color:var(--muted)}
+
+.cmds{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 40px;margin-top:40px}
+.cmds div{display:grid;grid-template-columns:150px minmax(0,1fr);gap:16px;padding:12px 0;border-bottom:1px solid var(--rule);font-size:.92rem}
+.cmds code{font-weight:600}
+.cmds span{color:var(--muted)}
+
+.steps{display:grid;gap:14px;counter-reset:q}
+.step{display:grid;grid-template-columns:56px minmax(0,1fr);gap:18px;background:var(--panel);border:1px solid var(--rule);border-radius:4px;padding:20px}
+.step::before{counter-increment:q;content:counter(q);font:900 2rem/1 var(--display);font-stretch:118%;color:var(--ink)}
+.step.hand::before{color:var(--signal)}
+.step .body{display:grid;gap:10px;min-width:0}
+.step .who{font:600 .68rem/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.step.hand .who{color:var(--signal)}
+.step p{color:var(--muted);max-width:68ch}
+.cmdline{display:flex;align-items:stretch;border:1px solid var(--rule);border-radius:3px;background:var(--paper);min-width:0}
+.cmdline code{flex:1;padding:10px 12px;overflow-x:auto;white-space:pre;font-size:.84rem;min-width:0}
+.copy{appearance:none;border:0;border-left:1px solid var(--rule);background:none;color:var(--muted);font:600 .72rem/1 var(--mono);padding:0 14px;cursor:pointer;letter-spacing:.06em;text-transform:uppercase}
+.copy:hover{color:var(--signal)}
+.copy.done{color:var(--go)}
+.try{margin-top:28px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:24px;align-items:center;border-top:2px solid var(--signal);padding-top:22px}
+
+.needs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.needs div{display:grid;gap:6px;min-width:0}
+.needs b{font-family:var(--mono);font-size:.9rem}
+.needs p{color:var(--muted);font-size:.92rem}
+
+footer.band{padding-block:40px 56px;border-top:1px solid var(--rule);background:var(--paper)}
+footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;align-items:center;font:.82rem/1.5 var(--mono);color:var(--muted)}
+
+@media (max-width:860px){
+  .split,.annot,.needs,.cmds,.try{grid-template-columns:minmax(0,1fr)}
+  .loop{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .loop li:nth-child(2){border-right:0}
+  .loop li:nth-child(-n+2){border-bottom:1px solid var(--rule)}
+  .controls{grid-template-columns:minmax(0,1fr)}
+  .ledger .ln{grid-template-columns:minmax(0,1fr);gap:6px}
+  .ledger .ln.hd{display:none}
+  section.band{padding-block:60px}
+}
+@media (max-width:480px){
+  .loop{grid-template-columns:minmax(0,1fr)}
+  .loop li{border-right:0;border-bottom:1px solid var(--rule)}
+  .loop li:last-child{border-bottom:0}
+  .cmds div{grid-template-columns:minmax(0,1fr);gap:2px}
+  .step{grid-template-columns:minmax(0,1fr);gap:8px}
+  .top nav{display:none}
+}
+@media (prefers-reduced-motion:reduce){.bar,.launch{transition:none}}
+</style>
+</head>
+<body>
+<header class="top band">
+  <div class="wrap">
+    <div class="mark">
+      <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="9.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M11 11 L11 3.5" stroke="currentColor" stroke-width="1.5"/><path d="M11 11 L16.5 14" stroke="var(--signal)" stroke-width="2"/></svg>
+      Launch Control
+    </div>
+    <nav aria-label="Sections">
+      <a href="#two-kinds">Two kinds of work</a>
+      <a href="#mine">/lc:mine</a>
+      <a href="#loop">The loop</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/peter3605/launch-control">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<section class="hero band" style="padding-block:56px 40px">
+  <div class="wrap">
+    <p class="eyebrow">A backlog for Claude Code · Notion-backed</p>
+    <h1 style="margin-top:16px">Your launch is waiting on a clock <em>nobody started.</em></h1>
+    <p class="lede">Solo releases rarely slip because code is unwritten. They slip because a D-U-N-S number takes a month, SES production access is still a support case, and App Review runs a week. Launch Control tracks that work alongside the code, and tells you which clock to start today.</p>
+    <div class="meta">
+      <span class="chip" id="version">v0.15.0</span><span class="chip">MIT</span><span class="chip">macOS · Linux · WSL</span><span class="chip">Notion free plan is enough</span>
+    </div>
+
+    <div class="sheet" id="sheet">
+      <div class="sheet-head">
+        <span class="eyebrow">Sample board · <b>HX</b>, a made-up iOS app · calendar days</span>
+        <span class="legend mono" style="font-size:.72rem;color:var(--muted)"><span><i class="sw s"></i>shortest lead</span><span><i class="sw r"></i>up to longest</span><span style="color:var(--signal)">■ critical path</span></span>
+      </div>
+      <div class="chart-scroll">
+        <div class="chart" id="chart">
+          <div class="axis"><span class="eyebrow">Clock</span><div class="track" id="ticks"></div></div>
+          <div class="rows" id="rows"></div>
+        </div>
+      </div>
+      <div class="controls">
+        <div class="slider">
+          <label for="delay"><span>Put off <b id="pickName" style="color:var(--signal)">HX-15</b> by</span><output id="delayOut" for="delay">20 days</output></label>
+          <input type="range" id="delay" min="0" max="40" value="20" step="1">
+        </div>
+        <p class="verdict" id="verdict" aria-live="polite"></p>
+      </div>
+      <p class="foot">Pick a clock with no blockers on the left. Bars are placed on the longest lead, so a waiting story starts when its blocker could finish at worst. The same arithmetic runs in <code>/lc:mine</code>.</p>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="two-kinds">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">One board, two queues</p>
+      <h2>Your agent gets the code. You get the clocks.</h2>
+      <p class="lede">Every story carries one honest checkbox: can a Claude Code session finish this on its own? That checkbox decides which queue a story lands in.</p>
+    </div>
+    <div class="split">
+      <div class="half dim">
+        <span class="eyebrow">Agent can do this ✓</span>
+        <span class="cmd">/lc:next</span>
+        <h3>One unblocked story at a time</h3>
+        <ul>
+          <li>Never hands out a story while anything it waits on is still open.</li>
+          <li>Reads the story's notes and traps aloud before starting, because that is where the expensive mistakes are written down.</li>
+          <li>Filtered to this repo's prefix, so a session never wanders into another project.</li>
+        </ul>
+      </div>
+      <div class="half">
+        <span class="eyebrow">Agent can do this ✗</span>
+        <span class="cmd">/lc:mine</span>
+        <h3>The work only a human can do, longest lead first</h3>
+        <ul>
+          <li><b>Clocks</b>: external waits, each with a lead time you cannot compress, projected from the day it started.</li>
+          <li><b>Your desk</b>: self-serve tasks like a GUI build or a restore drill, smallest first.</li>
+          <li><b>Start today</b>: the one item that buys back the most calendar time, with the arithmetic printed.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="mine" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">What it prints</p>
+      <h2>A report nothing else writes</h2>
+      <p class="lede">Real output for a real iOS app on 16 September 2026, names changed. The two zero-lead Apple tasks look urgent. The arithmetic says they have five weeks to spare.</p>
+    </div>
+    <div class="term">
+      <div class="term-bar"><span>/lc:mine</span><span>calendar days</span></div>
+<pre><span class="d">As of 2026-09-16. All figures are calendar days.</span>
+
+<span class="h">CLOCKS - start these, then walk away</span>
+  <span class="o">HX-09</span>    lead   14-42  earliest finish 2026-09-30 .. 2026-10-28  [Ready]
+           Submit the partner API production-access application
+  HX-21    lead     1-7  earliest finish 2026-09-17 .. 2026-09-23  [Backlog, waits on HX-16, HX-19]
+           Submit for review
+  HX-08    lead     1-2  earliest finish 2026-09-17 .. 2026-09-18  [Ready]
+           Request SES production access to leave the sandbox
+  HX-14    lead       0  earliest finish 2026-09-16 .. 2026-09-16  [Ready]
+           Reissue the APNs key as Sandbox AND Production
+  HX-15    lead       0  earliest finish 2026-09-16 .. 2026-09-16  [Ready]
+           Create the App Store Connect app record
+
+  <span class="d">Unranked - External with no Lead days, so nothing can compute with them:</span>
+  HX-06    [Ready] Rotate both partner API keys, then deploy
+           Lead time says: one partner issues keys by request, not self-service - lead time unknown
+
+<span class="h">YOUR DESK - self-serve and unblocked, smallest first</span>
+  HX-07    XS  Back up the encryption key outside the secrets store
+  HX-04    S   Run the first terraform apply since 2026-08-26
+  HX-10    S   Do the timed restore drill and record the RTO
+
+<span class="h">START TODAY</span>
+  <span class="k">HX-09 - Submit the partner API production-access application</span>
+  Chain:  HX-09 14-42 = 14-42 days
+  HX ends no sooner than 14-42+ days out (2026-09-30 .. 2026-10-28), so <span class="o">slack = 42 - 42 = 0.</span>
+  <span class="k">Every day this waits moves that launch a day.</span>
+
+  Runners-up (slack, chain on the max bound):
+    HX-14    slack   35  chain 1-7
+    HX-15    slack   35  chain 1-7
+    HX-08    slack   40  chain 1-2
+
+  <span class="d">? = unknown lead counted as 0.  + = a floor, because an unknown lead sits in that chain.</span></pre>
+    </div>
+    <div class="annot">
+      <div><h3>Slack, computed</h3><p>Each clock's slack is the launch's longest chain minus its own. Zero slack means every day of delay lands on the launch date.</p></div>
+      <div><h3>Running clocks count down</h3><p>A D-U-N-S request started three weeks ago with a 5–30 day lead has at most 9 days left, and the report says so.</p></div>
+      <div><h3>Unknowns stay visible</h3><p>A clock with no lead days is listed as unranked, so nobody mistakes "unknown" for "instant".</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="band" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">The other half</p>
+      <h2>Done means someone checked</h2>
+      <p class="lede">Every story has a <b>Done when</b> that a stranger could verify: a command that exits 0, a file holding a value, a screen showing a thing. <code>/lc:done</code> runs that check before it ticks anything off.</p>
+    </div>
+    <div class="ledger">
+      <div class="ln hd"><span>Story</span><span>Restates the title</span><span>Checkable</span></div>
+      <div class="ln"><span class="who">Release tags</span><span class="bad">Releases are tagged properly</span><span class="good"><code>python3 -B tests/check_release_tag.py</code> exits 0 on main, and CI runs it daily</span></div>
+      <div class="ln"><span class="who">Email sandbox</span><span class="bad">SES is set up</span><span class="good">The SES console shows production access, and a test email reaches an address outside the verified list</span></div>
+      <div class="ln"><span class="who">Restore drill</span><span class="bad">Backups work</span><span class="good">A restore from last week's dump completes, and the recorded RTO is in the runbook</span></div>
+    </div>
+    <p class="loop-note" style="margin-top:18px"><code>/lc:reconcile</code> re-audits open stories against the repo and needs evidence to close any of them.</p>
+  </div>
+</section>
+
+<section class="band" id="loop" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">Day to day</p>
+      <h2>The loop a session runs</h2>
+    </div>
+    <ol class="loop" style="margin:0;padding:0">
+      <li><code>/lc:groom</code><p>Files a new item with real acceptance criteria. <code style="font-size:.85rem;color:inherit">/lc:plan</code> files a whole backlog from a design doc.</p></li>
+      <li><code>/lc:next</code><p>Hands out the first Ready story a session can do, and reads its traps aloud.</p></li>
+      <li><code>/lc:start</code><p>Claims it: sets the status, cuts a branch, binds the session to the story.</p></li>
+      <li><code>/lc:done</code><p>Runs the check, ships through a PR, and promotes every story that was waiting on this one.</p></li>
+    </ol>
+    <p class="loop-note">Two hooks keep it honest. At session start, the agent is told which story it is bound to and the repo's standing warnings. A session with a claimed story is asked once before it exits.</p>
+
+    <div class="cmds">
+      <div><code>/lc:init</code><span>Builds both Notion databases and all ten views, then checks them</span></div>
+      <div><code>/lc:plan</code><span>Turns a design doc or repo into a project and its backlog</span></div>
+      <div><code>/lc:release</code><span>Drops a bound story without shipping it, with the reason recorded</span></div>
+      <div><code>/lc:mine</code><span>Clocks, your desk, and the one thing to start today</span></div>
+      <div><code>/lc:status</code><span>Where every project stands</span></div>
+      <div><code>/lc:reconcile</code><span>Audits the board against the repo</span></div>
+      <div><code>/lc:doctor</code><span>Catches config and view filters that broke without saying so</span></div>
+      <div><code>/lc:groom</code><span>Files one item, with a Done when</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="install" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">Quickstart</p>
+      <h2>Five steps. Three happen in a browser.</h2>
+      <p class="lede">About five minutes if Notion is already connected to Claude Code, about half an hour from nothing. The orange steps are ones no script can do for you.</p>
+    </div>
+    <div class="steps">
+      <div class="step"><div class="body">
+        <span class="who">Terminal</span><h3>Set the machine up</h3>
+        <p>Checks <code>claude</code>, <code>python3</code>, <code>git</code> and <code>gh</code>, adds the Notion MCP server and installs the plugin. Run it bare first: it's a dry run that changes nothing.</p>
+        <div class="cmdline"><code>git clone https://github.com/peter3605/launch-control.git && cd launch-control && ./setup.sh --apply</code><button class="copy" type="button">Copy</button></div>
+      </div></div>
+      <div class="step hand"><div class="body">
+        <span class="who">Browser</span><h3>Authorise Notion</h3>
+        <p>Run <code>/mcp</code> inside Claude Code and finish Notion's sign-in. Setup configured the connector. This step grants it access.</p>
+      </div></div>
+      <div class="step hand"><div class="body">
+        <span class="who">Browser</span><h3>Share the page the board will live under</h3>
+        <p>In Notion, open the page, then <code>···</code> → Add connections → Notion. Skip this and the connector works but returns nothing, which is the most common broken setup.</p>
+      </div></div>
+      <div class="step hand"><div class="body">
+        <span class="who">Claude Code</span><h3>Turn on auto-update</h3>
+        <p><code>/plugin</code> → Marketplaces → launch-control → Enable auto-update. Third-party marketplaces don't update on their own.</p>
+      </div></div>
+      <div class="step"><div class="body">
+        <span class="who">Claude Code, in your repo</span><h3>Build the board and pull the first story</h3>
+        <p>The board starts empty, so file something before asking for work.</p>
+        <div class="cmdline"><code>/lc:init</code><button class="copy" type="button">Copy</button></div>
+        <div class="cmdline"><code>/lc:groom Request SES production access</code><button class="copy" type="button">Copy</button></div>
+        <div class="cmdline"><code>/lc:next</code><button class="copy" type="button">Copy</button></div>
+      </div></div>
+    </div>
+
+    <div class="try">
+      <div><p class="eyebrow" style="color:var(--signal)">Before any of that</p><h3 style="margin-top:8px;font-size:1.4rem">See it in ten seconds, with only python3</h3><p style="color:var(--muted);margin-top:8px">No Notion, no plugin, no Claude Code. It runs the ranking on the sample board that ships with the repo.</p></div>
+      <div class="cmdline"><code>python3 plugins/lc/skills/mine/mine.py --view examples/sample-board.json</code><button class="copy" type="button">Copy</button></div>
+    </div>
+  </div>
+</section>
+
+<section class="band" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head"><p class="eyebrow">What you need</p><h2>Two things it doesn't ship</h2></div>
+    <div class="needs">
+      <div><b>Claude Code</b><p>The commands are Claude Code skills and the two guards are Claude Code hooks.</p></div>
+      <div><b>A Notion board</b><p>The free plan is enough. Every read is a saved view, which Notion doesn't meter.</p></div>
+      <div><b>python3 · git · gh</b><p><code>gh</code> is needed only by <code>/lc:done</code>, to open the PR and read the checks.</p></div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="band">
+  <div class="wrap">
+    <span>Launch Control · MIT · built with Claude Code</span>
+    <a href="https://github.com/peter3605/launch-control">github.com/peter3605/launch-control ↗</a>
+  </div>
+</footer>
+
+<script>
+(function(){
+  var SPAN = 84; // 12 weeks on the axis
+  var clocks = [
+    {id:'HX-09', name:'Partner API production access', min:14, max:42, after:[]},
+    {id:'HX-15', name:'App Store Connect app record', min:0, max:1, after:[]},
+    {id:'HX-19', name:'TestFlight beta review', min:1, max:2, after:['HX-15']},
+    {id:'HX-21', name:'App Store review', min:1, max:7, after:['HX-15','HX-19']},
+    {id:'HX-08', name:'SES production access', min:1, max:2, after:[]}
+  ];
+  var byId = {}; clocks.forEach(function(c){ byId[c.id]=c; });
+  var roots = clocks.filter(function(c){ return !c.after.length; }).map(function(c){ return c.id; });
+  var pick = 'HX-15';
+
+  function plan(delays){
+    var out = {};
+    clocks.forEach(function(c){ // listed in dependency order
+      var sMax = delays[c.id]||0, sMin = delays[c.id]||0;
+      c.after.forEach(function(p){ sMax = Math.max(sMax, out[p].eMax); sMin = Math.max(sMin, out[p].eMin); });
+      out[c.id] = {s:sMax, eMin:sMin+c.min, eMax:sMax+c.max, wait:delays[c.id]||0};
+    });
+    var lMin=0,lMax=0; clocks.forEach(function(c){ lMin=Math.max(lMin,out[c.id].eMin); lMax=Math.max(lMax,out[c.id].eMax); });
+    out.launch = {min:lMin, max:lMax};
+    return out;
+  }
+  function descendants(id){
+    var set = {}; set[id]=1; var grew=true;
+    while(grew){ grew=false; clocks.forEach(function(c){ if(!set[c.id] && c.after.some(function(p){return set[p];})){ set[c.id]=1; grew=true; } }); }
+    return set;
+  }
+  var base = plan({});
+  function slackOf(id){
+    var d = descendants(id), m = 0;
+    Object.keys(d).forEach(function(k){ m = Math.max(m, base[k].eMax); });
+    return base.launch.max - m;
+  }
+  function pct(d){ return (d/SPAN*100)+'%'; }
+
+  var ticks = document.getElementById('ticks');
+  for(var w=0; w<=12; w+=2){ var t=document.createElement('span'); t.className='tick'; t.style.left=pct(w*7); t.textContent= w===0?'today':'wk '+w; ticks.appendChild(t); }
+
+  var rowsEl = document.getElementById('rows');
+  var bars = {};
+  clocks.forEach(function(c){
+    var row = document.createElement('div'); row.className='row';
+    var isRoot = roots.indexOf(c.id)>=0;
+    var lab = document.createElement(isRoot?'button':'div');
+    lab.className='label'+(isRoot?' pick':'');
+    if(isRoot){ lab.type='button'; lab.setAttribute('aria-pressed','false'); lab.addEventListener('click',function(){ pick=c.id; render(); }); }
+    lab.innerHTML='<span class="id">'+c.id+'</span><span class="nm">'+c.name+'</span>'+(c.after.length?'<span class="dep">waits on '+c.after.join(', ')+'</span>':'');
+    var lane = document.createElement('div'); lane.className='lane';
+    var bar = document.createElement('div'); bar.className='bar';
+    bar.innerHTML='<i class="wait"></i><i class="solid"></i><i class="range"></i><span class="tag"></span>';
+    lane.appendChild(bar); row.appendChild(lab); row.appendChild(lane); rowsEl.appendChild(row);
+    bars[c.id]={bar:bar,lab:lab};
+  });
+  var launch = document.createElement('div'); launch.className='launch'; launch.innerHTML='<span>LAUNCH</span>';
+  // the launch band sits over the lane column only
+  var overlay = document.createElement('div'); overlay.style.cssText='position:absolute;top:0;bottom:0;left:230px;right:0;pointer-events:none';
+  overlay.appendChild(launch); rowsEl.appendChild(overlay);
+
+  var slider = document.getElementById('delay'), outEl = document.getElementById('delayOut'),
+      nameEl = document.getElementById('pickName'), verdict = document.getElementById('verdict');
+
+  function render(){
+    var d = +slider.value, delays = {}; delays[pick]=d;
+    var p = plan(delays);
+    // critical path: clocks whose chain ends at the launch's max
+    var critSet = {};
+    roots.forEach(function(r){ var ds=descendants(r), m=0; Object.keys(ds).forEach(function(k){ m=Math.max(m,p[k].eMax); }); if(m===p.launch.max){ Object.keys(ds).forEach(function(k){ critSet[k]=1; }); } });
+    clocks.forEach(function(c){
+      var b = bars[c.id], r = p[c.id];
+      b.bar.style.left = pct(r.s);
+      var laneW = b.bar.parentNode.clientWidth;
+      b.bar.querySelector('.solid').style.flex = '0 0 '+ (c.min ? c.min/SPAN*laneW+'px' : '3px');
+      b.bar.querySelector('.range').style.flex = '0 0 '+ (c.max-c.min)/SPAN*laneW +'px';
+      b.bar.querySelector('.wait').style.width = r.wait/SPAN*laneW+'px';
+      b.bar.querySelector('.tag').textContent = c.min===c.max ? c.min+'d' : c.min+'–'+c.max+'d';
+      b.bar.classList.toggle('crit', !!critSet[c.id]);
+      if(b.lab.tagName==='BUTTON'){ var on = c.id===pick; b.lab.classList.toggle('on',on); b.lab.setAttribute('aria-pressed',on?'true':'false'); }
+    });
+    launch.style.left = pct(0);
+    launch.style.width = pct(p.launch.max);
+    launch.style.background = 'linear-gradient(90deg,transparent '+(p.launch.min/p.launch.max*100)+'%,var(--signal-soft) '+(p.launch.min/p.launch.max*100)+'%)';
+    nameEl.textContent = pick;
+    outEl.textContent = d===1 ? '1 day' : d+' days';
+    var cost = p.launch.max - base.launch.max, slack = slackOf(pick);
+    var chip = cost<=0 ? '<span class="cost zero">+0 days</span>' : '<span class="cost hurt">+'+cost+' day'+(cost===1?'':'s')+'</span>';
+    var msg;
+    if(d===0) msg = '<b>'+pick+'</b> has <b>'+slack+'</b> day'+(slack===1?'':'s')+' of slack. Launch lands on day '+base.launch.min+'–'+base.launch.max+'.';
+    else if(cost<=0) msg = 'Launch doesn\'t move. <b>'+pick+'</b> has '+slack+' days of slack, so it can wait while you start the clock that can\'t.';
+    else if(slack===0) msg = 'Launch moves a day for every day <b>'+pick+'</b> waits. It is the clock to start today.';
+    else msg = 'The first '+slack+' days were free. Past that, every day <b>'+pick+'</b> waits lands on the launch.';
+    verdict.innerHTML = chip + msg;
+  }
+  slider.addEventListener('input', render);
+  window.addEventListener('resize', render);
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(render);
+  render();
+
+  document.querySelectorAll('.copy').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var code = btn.previousElementSibling, text = code.textContent;
+      function ok(){ btn.textContent='Copied'; btn.classList.add('done'); setTimeout(function(){ btn.textContent='Copy'; btn.classList.remove('done'); },1600); }
+      function fallback(){ var r=document.createRange(); r.selectNodeContents(code); var s=getSelection(); s.removeAllRanges(); s.addRange(r); btn.textContent='Selected'; }
+      try { navigator.clipboard.writeText(text).then(ok, fallback); } catch(e){ fallback(); }
+    });
+  });
+})();
+</script>
+
+</body>
+</html>
