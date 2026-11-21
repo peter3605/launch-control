@@ -2,6 +2,8 @@
 
 A backlog for people shipping real software with coding agents.
 
+**Site:** [peter3605.github.io/launch-control](https://peter3605.github.io/launch-control/), with a live chart of which clock moves the launch.
+
 Most agent task tools help an agent decide what to write next. This one is built
 around a different observation: **when a solo developer is late, it is usually not
 because code is unwritten.** It is because a D-U-N-S number can take six weeks

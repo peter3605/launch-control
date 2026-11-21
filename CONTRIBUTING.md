@@ -61,6 +61,13 @@ A stale baseline makes the drift check in those repos report agreement it never
 checked — which is worse than a wrong number, because it is a check that has
 quietly stopped checking.
 
+The landing page in `site/index.html` shows the version too, in its `id="version"`
+chip. It is not one of the three records, but `tests/test_site.py` fails until it
+matches `plugin.json`, so update it in the same commit. The same test holds the
+page's command list to `plugins/lc/skills/`, its `/lc:mine` report to the README's
+copy, and its chart to `examples/sample-board.json`; a merge to `main` that touches
+`site/` republishes it through `.github/workflows/pages.yml`.
+
 **Bump the version whenever command or hook behaviour changes.** Documentation-only
 changes do not need one. The full argument is in `tests/check_version_sync.py`'s
 own docstring.
